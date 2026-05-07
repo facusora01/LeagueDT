@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Summoner {
+  id            String   @id @default(uuid())
+  puuid         String   @unique
+  accountId     String   @unique
+  summonerId    String   @unique
+  name          String
+  tagLine       String
+  profileIconId Int
+  level         Int
+  region        String
+  lastUpdated   DateTime
+  createdAt     DateTime @default(now())
+
+  championMasteries ChampionMastery[]
+  participants      Participant[]
+}
+
+model ChampionMastery {
+  id           String   @id @default(uuid())
+  summonerId   String
+  championId   Int
+  level        Int
+  points       Int
+  lastPlayTime DateTime
+  chestGranted Boolean
+  tokensEarned Int
+
+  summoner     Summoner @relation(fields: [summonerId], references: [id])
+  
+  @@unique([summonerId, championId])
+}
+
+model Match {
+  id              String   @id
+  gameId          BigInt
+  platformId      String
+  queueId         Int
+  mapId           Int
+  seasonId        Int
+  gameCreation    DateTime
+  gameDuration    Int
+  gameMode        String
+  gameType        String
+  gameVersion     String
+  createdAt       DateTime @default(now())
+
+  teams           Team[]
+  participants    Participant[]
+}
+
+model Team {
+  id              String   @id @default(uuid())
+  matchId         String
+  teamId          Int
+  win             Boolean
+  firstBlood      Boolean
+  firstTower      Boolean
+  firstInhibitor  Boolean
+  firstBaron      Boolean
+  firstDragon     Boolean
+  firstRiftHerald Boolean
+  towerKills      Int
+  inhibitorKills  Int
+  baronKills      Int
+  dragonKills     Int
+  riftHeraldKills Int
+
+  match           Match    @relation(fields: [matchId], references: [id])
+}
+
+model Participant {
+  id                          String   @id @default(uuid())
+  matchId                     String
+  teamId                      Int
+  championId                  Int
+  summonerId                  String?
+  summonerName                String
+  participantId               Int
+  kills                       Int
+  deaths                      Int
+  assists                     Int
+  goldEarned                  Int
+  goldSpent                   Int
+  totalDamageDealt            Int
+  totalDamageDealtToChampions Int
+  totalDamageTaken            Int
+  totalHeal                   Int
+  visionScore                 Int
+  wardsPlaced                 Int
+  wardsKilled                 Int
+  creepScore                  Int
+  neutralMinionsKilled        Int
+  teamObjectiveKills          Int
+  win                         Boolean
+  
+  items                       String   // JSON string of item IDs
+
+  role                        String
+  lane                        String
+
+  match                       Match    @relation(fields: [matchId], references: [id])
+  summoner                    Summoner? @relation(fields: [summonerId], references: [id])
+}
+
+model UserPreference {
+  id                   String   @id @default(uuid())
+  summonerId           String   @unique
+  theme                String   @default("dark")
+  language             String   @default("es_AR")
+  notificationsEnabled Boolean  @default(true)
+  soundEnabled         Boolean  @default(true)
+  overlayEnabled       Boolean  @default(true)
+  overlayPosition      String   @default("TOP_RIGHT")
+  recommendationLevel  String   @default("DETAILED")
+  autoImportRunes      Boolean  @default(false)
+  region               String   @default("LA2")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
