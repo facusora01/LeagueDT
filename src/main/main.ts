@@ -1,8 +1,12 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
+import { LcuConnector } from './api/lcu/LcuConnector';
+
+let mainWindow: BrowserWindow | null = null;
+const lcuConnector = new LcuConnector();
 
 function createWindow() {
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
     transparent: true,
@@ -26,8 +30,19 @@ function createWindow() {
 
 app.whenReady().then(() => {
   ipcMain.handle('ping', () => 'Pong desde el proceso Main (Electron)!');
+  ipcMain.handle('get-lcu-status', () => lcuConnector.isConnected ? 'connected' : 'disconnected');
 
   createWindow();
+
+  lcuConnector.on('connect', () => {
+    if (mainWindow) mainWindow.webContents.send('lcu-status', 'connected');
+  });
+
+  lcuConnector.on('disconnect', () => {
+    if (mainWindow) mainWindow.webContents.send('lcu-status', 'disconnected');
+  });
+
+  lcuConnector.start();
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -35,5 +50,6 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', function () {
+  lcuConnector.stop();
   if (process.platform !== 'darwin') app.quit();
 });

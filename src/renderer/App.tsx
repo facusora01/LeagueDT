@@ -2,11 +2,22 @@ import React, { useEffect, useState } from 'react';
 
 const App: React.FC = () => {
   const [pingResponse, setPingResponse] = useState<string>('Esperando ping...');
+  const [lcuStatus, setLcuStatus] = useState<'connected' | 'disconnected'>('disconnected');
 
   useEffect(() => {
     if (window.electronAPI) {
       window.electronAPI.ping().then(response => {
         setPingResponse(response);
+      });
+
+      // Get initial status
+      window.electronAPI.getLcuStatus().then(status => {
+        setLcuStatus(status);
+      });
+
+      // Listen for LCU status changes
+      window.electronAPI.onLcuStatusChange((status) => {
+        setLcuStatus(status);
       });
     } else {
       setPingResponse('No electronAPI found (Ejecutando en navegador)');
@@ -21,9 +32,22 @@ const App: React.FC = () => {
       
       <div className="w-96 max-w-full text-center mt-12 p-6 rounded-lg bg-surface border border-border shadow-xl no-drag">
         <h2 className="text-2xl font-bold mb-4 text-secondary">Director Técnico Listo</h2>
-        <p className="text-muted-foreground mb-4">El proyecto Base (Fase 1) está corriendo correctamente.</p>
+        <p className="text-muted-foreground mb-6">El proyecto Base (Fase 1) está corriendo correctamente. Conectando Phase 2...</p>
         
-        <div className="bg-surface-light p-3 rounded-md border border-border text-sm font-mono text-left overflow-hidden">
+        <div className={`p-4 rounded-md border flex items-center justify-between mb-4 ${
+          lcuStatus === 'connected' 
+            ? 'bg-success/10 border-success/30 text-success' 
+            : 'bg-destructive/10 border-destructive/30 text-destructive'
+        }`}>
+          <div className="flex items-center gap-3">
+            <div className={`w-3 h-3 rounded-full ${lcuStatus === 'connected' ? 'bg-success shadow-[0_0_8px_theme(colors.success.DEFAULT)]' : 'bg-destructive animate-pulse'}`}></div>
+            <span className="font-medium">
+              {lcuStatus === 'connected' ? 'Cliente Conectado' : 'Esperando Cliente de LoL...'}
+            </span>
+          </div>
+        </div>
+
+        <div className="bg-surface-light p-3 rounded-md border border-border text-sm font-mono text-left overflow-hidden opacity-70">
           <span className="text-info">IPC Status:</span> {pingResponse}
         </div>
       </div>

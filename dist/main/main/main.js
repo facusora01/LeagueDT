@@ -35,8 +35,11 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
 const path = __importStar(require("path"));
+const LcuConnector_1 = require("./api/lcu/LcuConnector");
+let mainWindow = null;
+const lcuConnector = new LcuConnector_1.LcuConnector();
 function createWindow() {
-    const mainWindow = new electron_1.BrowserWindow({
+    mainWindow = new electron_1.BrowserWindow({
         width: 800,
         height: 600,
         transparent: true,
@@ -58,13 +61,24 @@ function createWindow() {
 }
 electron_1.app.whenReady().then(() => {
     electron_1.ipcMain.handle('ping', () => 'Pong desde el proceso Main (Electron)!');
+    electron_1.ipcMain.handle('get-lcu-status', () => lcuConnector.isConnected ? 'connected' : 'disconnected');
     createWindow();
+    lcuConnector.on('connect', () => {
+        if (mainWindow)
+            mainWindow.webContents.send('lcu-status', 'connected');
+    });
+    lcuConnector.on('disconnect', () => {
+        if (mainWindow)
+            mainWindow.webContents.send('lcu-status', 'disconnected');
+    });
+    lcuConnector.start();
     electron_1.app.on('activate', function () {
         if (electron_1.BrowserWindow.getAllWindows().length === 0)
             createWindow();
     });
 });
 electron_1.app.on('window-all-closed', function () {
+    lcuConnector.stop();
     if (process.platform !== 'darwin')
         electron_1.app.quit();
 });
