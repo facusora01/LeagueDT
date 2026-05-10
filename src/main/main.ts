@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
 import { LcuConnector } from './api/lcu/LcuConnector';
+import { SettingsRepository } from './database/repositories/SettingsRepository';
 
 let mainWindow: BrowserWindow | null = null;
 const lcuConnector = new LcuConnector();
@@ -31,6 +32,8 @@ function createWindow() {
 app.whenReady().then(() => {
   ipcMain.handle('ping', () => 'Pong desde el proceso Main (Electron)!');
   ipcMain.handle('get-lcu-status', () => lcuConnector.isConnected ? 'connected' : 'disconnected');
+  ipcMain.handle('db:get-settings', async () => await SettingsRepository.getSettings());
+  ipcMain.handle('db:update-settings', async (_event, settings) => await SettingsRepository.updateSettings(settings));
 
   createWindow();
 

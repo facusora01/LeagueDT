@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 const App: React.FC = () => {
   const [pingResponse, setPingResponse] = useState<string>('Esperando ping...');
   const [lcuStatus, setLcuStatus] = useState<'connected' | 'disconnected'>('disconnected');
+  const [dbSettings, setDbSettings] = useState<any>(null);
 
   useEffect(() => {
     if (window.electronAPI) {
@@ -19,10 +20,23 @@ const App: React.FC = () => {
       window.electronAPI.onLcuStatusChange((status) => {
         setLcuStatus(status);
       });
+
+      // Fetch DB Settings
+      window.electronAPI.getSettings().then(settings => {
+        setDbSettings(settings);
+      });
     } else {
       setPingResponse('No electronAPI found (Ejecutando en navegador)');
     }
   }, []);
+
+  const toggleTheme = async () => {
+    if (window.electronAPI && dbSettings) {
+      const newTheme = dbSettings.theme === 'dark' ? 'light' : 'dark';
+      const updated = await window.electronAPI.updateSettings({ theme: newTheme });
+      setDbSettings(updated);
+    }
+  };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background text-foreground">
@@ -47,9 +61,26 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-surface-light p-3 rounded-md border border-border text-sm font-mono text-left overflow-hidden opacity-70">
+        <div className="bg-surface-light p-3 rounded-md border border-border text-sm font-mono text-left overflow-hidden opacity-70 mb-4">
           <span className="text-info">IPC Status:</span> {pingResponse}
         </div>
+
+        {dbSettings && (
+          <div className="p-4 rounded-md border border-border text-left">
+            <h3 className="font-semibold text-primary mb-2 flex items-center justify-between">
+              Base de Datos SQLite
+              <button 
+                onClick={toggleTheme}
+                className="text-xs bg-primary/20 text-primary px-2 py-1 rounded hover:bg-primary/30 transition-colors"
+              >
+                Alternar Tema
+              </button>
+            </h3>
+            <pre className="text-xs text-muted-foreground overflow-auto p-2 bg-background rounded">
+              {JSON.stringify(dbSettings, null, 2)}
+            </pre>
+          </div>
+        )}
       </div>
     </div>
   );

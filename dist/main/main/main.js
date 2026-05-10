@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
 const path = __importStar(require("path"));
 const LcuConnector_1 = require("./api/lcu/LcuConnector");
+const SettingsRepository_1 = require("./database/repositories/SettingsRepository");
 let mainWindow = null;
 const lcuConnector = new LcuConnector_1.LcuConnector();
 function createWindow() {
@@ -62,6 +63,8 @@ function createWindow() {
 electron_1.app.whenReady().then(() => {
     electron_1.ipcMain.handle('ping', () => 'Pong desde el proceso Main (Electron)!');
     electron_1.ipcMain.handle('get-lcu-status', () => lcuConnector.isConnected ? 'connected' : 'disconnected');
+    electron_1.ipcMain.handle('db:get-settings', async () => await SettingsRepository_1.SettingsRepository.getSettings());
+    electron_1.ipcMain.handle('db:update-settings', async (_event, settings) => await SettingsRepository_1.SettingsRepository.updateSettings(settings));
     createWindow();
     lcuConnector.on('connect', () => {
         if (mainWindow)
