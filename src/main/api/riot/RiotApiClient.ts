@@ -115,11 +115,12 @@ export class RiotApiClient {
   }
 
   getRoutingValue(region: RiotRegion): RiotRoutingValue {
-    if ([RiotRegion.NA1, RiotRegion.BR1, RiotRegion.LA1, RiotRegion.LA2].includes(region))
+    const r = region.toLowerCase() as RiotRegion;
+    if ([RiotRegion.NA1, RiotRegion.BR1, RiotRegion.LA1, RiotRegion.LA2].includes(r))
       return RiotRoutingValue.AMERICAS;
-    if ([RiotRegion.EUW1, RiotRegion.EUN1, RiotRegion.TR1, RiotRegion.RU].includes(region))
+    if ([RiotRegion.EUW1, RiotRegion.EUN1, RiotRegion.TR1, RiotRegion.RU].includes(r))
       return RiotRoutingValue.EUROPE;
-    if ([RiotRegion.KR, RiotRegion.JP1].includes(region))
+    if ([RiotRegion.KR, RiotRegion.JP1].includes(r))
       return RiotRoutingValue.ASIA;
     return RiotRoutingValue.SEA;
   }

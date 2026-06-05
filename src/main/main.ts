@@ -71,7 +71,8 @@ function registerIpcHandlers() {
 
   // ── Summoner ──────────────────────────────────────────────────────────────
   ipcMain.handle('summoner:search', async (_e, gameName: string, tagLine: string, region: string) => {
-    const riotRegion = region as RiotRegion;
+    // UI sends region as an uppercase label (e.g. 'LA2'); enum values are lowercase.
+    const riotRegion = region.toLowerCase() as RiotRegion;
     const routing = riotClient.getRoutingValue(riotRegion);
 
     const account = await riotClient.getAccountByRiotId(routing, gameName, tagLine);

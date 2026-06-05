@@ -62,7 +62,7 @@ export const SummonerView: React.FC = () => {
       await loadMastery(s.summonerId);
     } catch (e: any) {
       const msg: string = e?.message ?? '';
-      if (msg.includes('401')) {
+      if (msg.includes('401') || msg.includes('403')) {
         setError('API key inválida o expirada. Regenerá una en developer.riotgames.com y guardala arriba.');
       } else if (msg.includes('404')) {
         setError('Invocador no encontrado. Revisá nombre, tag y región.');
