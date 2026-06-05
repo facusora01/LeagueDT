@@ -80,8 +80,8 @@ function registerIpcHandlers() {
 
     const saved = await SummonerRepository.upsert({
       puuid: account.puuid,
-      accountId: summoner.accountId,
-      summonerId: summoner.id,
+      accountId: summoner.accountId ?? null,
+      summonerId: summoner.id ?? null,
       name: account.gameName,
       tagLine: account.tagLine,
       profileIconId: summoner.profileIconId,
@@ -96,8 +96,10 @@ function registerIpcHandlers() {
   ipcMain.handle('summoner:get-all', () => SummonerRepository.findAll());
 
   // ── Champion Mastery ──────────────────────────────────────────────────────
-  ipcMain.handle('mastery:sync', async (_e, summonerId: string) => {
-    const summoner = await SummonerRepository.findBySummonerId(summonerId);
+  // Identifier is the internal Summoner.id (PK), since Riot's encrypted
+  // summonerId is no longer returned by the API.
+  ipcMain.handle('mastery:sync', async (_e, id: string) => {
+    const summoner = await SummonerRepository.findById(id);
     if (!summoner) throw new Error('Summoner not found');
 
     const riotRegion = summoner.region as RiotRegion;
@@ -131,8 +133,8 @@ function registerIpcHandlers() {
     MatchRepository.findBySummonerId(summonerId, limit),
   );
 
-  ipcMain.handle('matches:sync', async (_e, summonerId: string, count = 10) => {
-    const summoner = await SummonerRepository.findBySummonerId(summonerId);
+  ipcMain.handle('matches:sync', async (_e, id: string, count = 10) => {
+    const summoner = await SummonerRepository.findById(id);
     if (!summoner) throw new Error('Summoner not found');
 
     const riotRegion = summoner.region as RiotRegion;

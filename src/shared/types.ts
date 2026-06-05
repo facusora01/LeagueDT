@@ -186,8 +186,8 @@ export enum Role {
 export interface Summoner {
   id: string;
   puuid: string;
-  accountId: string;
-  summonerId: string;
+  accountId: string | null;
+  summonerId: string | null;
   name: string;
   tagLine: string;
   profileIconId: number;

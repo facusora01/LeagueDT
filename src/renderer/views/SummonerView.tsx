@@ -31,7 +31,7 @@ export const SummonerView: React.FC = () => {
     api.getAllSummoners().then(list => {
       if (list.length > 0) {
         setSummoner(list[0]);
-        loadMastery(list[0].summonerId);
+        loadMastery(list[0].id);
       }
     });
     api.getSettings().then(s => setHasStoredKey(!!s?.apiKey));
@@ -58,8 +58,8 @@ export const SummonerView: React.FC = () => {
     try {
       const s = await api.searchSummoner(gameName.trim(), tagLine.trim(), region);
       setSummoner(s);
-      await api.syncMastery(s.summonerId);
-      await loadMastery(s.summonerId);
+      await api.syncMastery(s.id);
+      await loadMastery(s.id);
     } catch (e: any) {
       const msg: string = e?.message ?? '';
       if (msg.includes('401') || msg.includes('403')) {

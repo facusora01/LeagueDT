@@ -49,10 +49,11 @@ export interface RiotAccount {
 }
 
 export interface RiotSummoner {
-  id: string;
-  accountId: string;
+  // Riot deprecated id/accountId on the by-puuid response — treat as optional.
+  id?: string;
+  accountId?: string;
   puuid: string;
-  name: string;
+  name?: string;
   profileIconId: number;
   revisionDate: number;
   summonerLevel: number;

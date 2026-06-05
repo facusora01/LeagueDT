@@ -9,8 +9,8 @@ datasource db {
 model Summoner {
   id            String   @id @default(uuid())
   puuid         String   @unique
-  accountId     String   @unique
-  summonerId    String   @unique
+  accountId     String?  @unique
+  summonerId    String?  @unique
   name          String
   tagLine       String
   profileIconId Int

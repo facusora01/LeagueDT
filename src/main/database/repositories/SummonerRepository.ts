@@ -7,6 +7,11 @@ export class SummonerRepository {
     return prisma.summoner.findUnique({ where: { puuid } });
   }
 
+  static async findById(id: string) {
+    const prisma = await DatabaseClient.getInstance();
+    return prisma.summoner.findUnique({ where: { id } });
+  }
+
   static async findBySummonerId(summonerId: string) {
     const prisma = await DatabaseClient.getInstance();
     return prisma.summoner.findUnique({ where: { summonerId } });
