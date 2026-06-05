@@ -9,6 +9,7 @@ const REGIONS = ['LA2', 'LA1', 'NA1', 'BR1', 'EUW1', 'EUN1', 'KR', 'JP1'];
 export const SummonerView: React.FC = () => {
   const [apiKey, setApiKey] = useState('');
   const [keySaved, setKeySaved] = useState(false);
+  const [hasStoredKey, setHasStoredKey] = useState(false);
   const [gameName, setGameName] = useState('');
   const [tagLine, setTagLine] = useState('');
   const [region, setRegion] = useState('LA2');
@@ -24,6 +25,7 @@ export const SummonerView: React.FC = () => {
         loadMastery(list[0].summonerId);
       }
     });
+    api.getSettings().then(s => setHasStoredKey(!!s?.apiKey));
   }, []);
 
   async function loadMastery(summonerId: string) {
@@ -37,6 +39,7 @@ export const SummonerView: React.FC = () => {
     if (!apiKey.trim()) return;
     await api.setApiKey(apiKey.trim());
     setKeySaved(true);
+    setHasStoredKey(true);
     setTimeout(() => setKeySaved(false), 2000);
   }
 
@@ -49,7 +52,16 @@ export const SummonerView: React.FC = () => {
       await api.syncMastery(s.summonerId);
       await loadMastery(s.summonerId);
     } catch (e: any) {
-      setError(e?.message ?? 'Error al buscar invocador. ¿API key válida?');
+      const msg: string = e?.message ?? '';
+      if (msg.includes('401')) {
+        setError('API key inválida o expirada. Regenerá una en developer.riotgames.com y guardala arriba.');
+      } else if (msg.includes('404')) {
+        setError('Invocador no encontrado. Revisá nombre, tag y región.');
+      } else if (msg.includes('not set')) {
+        setError('Falta la API key. Ingresala y guardala arriba.');
+      } else {
+        setError(msg || 'Error al buscar invocador.');
+      }
     } finally {
       setLoading(false);
     }
@@ -59,7 +71,15 @@ export const SummonerView: React.FC = () => {
     <div className="space-y-4 max-w-3xl">
       {/* API Key */}
       <Card className="p-4">
-        <SectionTitle right={keySaved ? <span className="text-xs text-success">✓ Guardada</span> : undefined}>
+        <SectionTitle
+          right={
+            keySaved ? (
+              <span className="text-xs text-success">✓ Guardada</span>
+            ) : hasStoredKey ? (
+              <span className="text-xs text-text-muted">Hay una key guardada</span>
+            ) : undefined
+          }
+        >
           Riot API Key
         </SectionTitle>
         <div className="flex gap-2">

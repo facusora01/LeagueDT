@@ -30,7 +30,11 @@ export class SummonerRepository {
 
   static async findAll() {
     const prisma = await DatabaseClient.getInstance();
-    return prisma.summoner.findMany({ orderBy: { lastUpdated: 'desc' } });
+    // Exclude the app-level placeholder summoner used to anchor settings.
+    return prisma.summoner.findMany({
+      where: { id: { not: 'local_user' } },
+      orderBy: { lastUpdated: 'desc' },
+    });
   }
 
   static async delete(id: string) {

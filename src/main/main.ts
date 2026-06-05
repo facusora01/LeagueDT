@@ -59,8 +59,9 @@ function registerIpcHandlers() {
   );
 
   // ── API Key ───────────────────────────────────────────────────────────────
-  ipcMain.handle('riot:set-api-key', (_e, key: string) => {
+  ipcMain.handle('riot:set-api-key', async (_e, key: string) => {
     riotClient.setApiKey(key);
+    await SettingsRepository.updateSettings({ apiKey: key });
     return { ok: true };
   });
 

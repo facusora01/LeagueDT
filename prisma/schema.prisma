@@ -287,6 +287,7 @@ model UserStatistics {
 model UserPreference {
   id                   String   @id @default(uuid())
   summonerId           String   @unique
+  apiKey               String?
   theme                String   @default("dark")
   language             String   @default("es_AR")
   notificationsEnabled Boolean  @default(true)
