@@ -262,18 +262,40 @@ function wireDraftEvents() {
 
 // Reads the logged-in account straight from the League client (no API key
 // needed) and persists it, then syncs mastery if a Riot key is available.
+//
+// Note: the LCU returns an obfuscated puuid (UUID form) that the public API
+// rejects. When a key is present we resolve the real encrypted puuid via the
+// Account API using the client-provided gameName/tagLine.
 async function loadCurrentSummonerFromLcu() {
   const current = await lcuConnector.request<any>('/lol-summoner/v1/current-summoner');
-  if (!current?.puuid) return;
+  const displayName = current?.gameName || current?.displayName;
+  if (!current || !displayName) return;
 
   const regionInfo = await lcuConnector.request<any>('/riotclient/region-locale');
   const region = (regionInfo?.region ?? 'LA2').toLowerCase();
 
+  const settings = await SettingsRepository.getSettings();
+  const hasKey = !!(settings as any).apiKey;
+
+  // Best-effort: resolve the real puuid so public-API calls work.
+  let puuid: string = current.puuid;
+  let realPuuid = false;
+  if (hasKey && current.gameName && current.tagLine) {
+    try {
+      const routing = riotClient.getRoutingValue(region as RiotRegion);
+      const account = await riotClient.getAccountByRiotId(routing, current.gameName, current.tagLine);
+      puuid = account.puuid;
+      realPuuid = true;
+    } catch (err) {
+      console.error('[LCU] Could not resolve real puuid via Account API:', err);
+    }
+  }
+
   const saved = await SummonerRepository.upsert({
-    puuid: current.puuid,
+    puuid,
     accountId: current.accountId ? String(current.accountId) : null,
     summonerId: current.summonerId ? String(current.summonerId) : null,
-    name: current.gameName || current.displayName || 'Invocador',
+    name: displayName,
     tagLine: current.tagLine ?? '',
     profileIconId: current.profileIconId ?? 0,
     level: current.summonerLevel ?? 0,
@@ -283,11 +305,10 @@ async function loadCurrentSummonerFromLcu() {
 
   mainWindow?.webContents.send('summoner:current', saved);
 
-  // Mastery needs the Riot API; only attempt it if a key is configured.
-  const settings = await SettingsRepository.getSettings();
-  if ((settings as any).apiKey) {
+  // Mastery requires the real puuid + a valid key.
+  if (realPuuid) {
     try {
-      const masteries = await riotClient.getAllChampionMasteries(region as RiotRegion, current.puuid);
+      const masteries = await riotClient.getAllChampionMasteries(region as RiotRegion, puuid);
       await ChampionMasteryRepository.upsertMany(
         saved.id,
         masteries.map(m => ({
