@@ -8,10 +8,13 @@ import { SummonerRepository } from './database/repositories/SummonerRepository';
 import { ChampionRepository } from './database/repositories/ChampionRepository';
 import { ChampionMasteryRepository } from './database/repositories/ChampionMasteryRepository';
 import { MatchRepository } from './database/repositories/MatchRepository';
+import { DraftSession } from './services/draft/DraftSession';
+import { LcuDraftDetector } from './services/draft/LcuDraftDetector';
 
 let mainWindow: BrowserWindow | null = null;
 const lcuConnector = new LcuConnector();
 const riotClient = new RiotApiClient();
+const draftSession = new DraftSession();
 let dataDragon: DataDragonManager | null = null;
 
 function createWindow() {
@@ -216,21 +219,47 @@ function registerIpcHandlers() {
 
   // ── DataDragon ────────────────────────────────────────────────────────────
   ipcMain.handle('datadragon:version', () => dataDragon?.currentVersion ?? null);
+
+  // ── Draft ─────────────────────────────────────────────────────────────────
+  ipcMain.handle('draft:get-state', () => draftSession.getState());
+}
+
+function wireDraftEvents() {
+  draftSession.on('stateChanged', state => {
+    mainWindow?.webContents.send('draft:state-changed', state);
+  });
+  draftSession.on('recommendations', recs => {
+    mainWindow?.webContents.send('draft:recommendations', recs);
+  });
+  draftSession.on('banSuggestions', bans => {
+    mainWindow?.webContents.send('draft:ban-suggestions', bans);
+  });
 }
 
 app.whenReady().then(async () => {
   registerIpcHandlers();
+  wireDraftEvents();
   createWindow();
 
-  // Initialize DataDragon in background after window opens
+  // Initialize DataDragon in background; after done, seed draft session with static data
   dataDragon = new DataDragonManager(app.getPath('userData'));
-  dataDragon.initialize().catch(err => console.error('[DataDragon] Init error:', err));
+  dataDragon.initialize().then(async () => {
+    const champions = await ChampionRepository.findAll();
+    draftSession.setStaticData(
+      champions.map(c => ({ id: c.id, name: c.name, tags: c.tags })),
+      [],
+    );
+    console.log(`[Draft] Loaded ${champions.length} champions into draft session`);
+  }).catch(err => console.error('[DataDragon] Init error:', err));
 
   // Apply saved API key if present
   const settings = await SettingsRepository.getSettings();
   if ((settings as any).apiKey) {
     riotClient.setApiKey((settings as any).apiKey);
   }
+
+  // Start draft detector (wires LCU events → draftSession)
+  new LcuDraftDetector(lcuConnector, draftSession);
 
   lcuConnector.on('connect', () => {
     mainWindow?.webContents.send('lcu-status', 'connected');

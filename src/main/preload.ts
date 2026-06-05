@@ -36,4 +36,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // ── DataDragon ────────────────────────────────────────────────────────────
   getDDVersion: () => ipcRenderer.invoke('datadragon:version'),
+
+  // ── Draft ─────────────────────────────────────────────────────────────────
+  getDraftState: () => ipcRenderer.invoke('draft:get-state'),
+  onDraftStateChanged: (cb: (state: any) => void) =>
+    ipcRenderer.on('draft:state-changed', (_e, state) => cb(state)),
+  onDraftRecommendations: (cb: (recs: any[]) => void) =>
+    ipcRenderer.on('draft:recommendations', (_e, recs) => cb(recs)),
+  onDraftBanSuggestions: (cb: (bans: any[]) => void) =>
+    ipcRenderer.on('draft:ban-suggestions', (_e, bans) => cb(bans)),
 });
