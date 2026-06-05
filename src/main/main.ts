@@ -10,11 +10,13 @@ import { ChampionMasteryRepository } from './database/repositories/ChampionMaste
 import { MatchRepository } from './database/repositories/MatchRepository';
 import { DraftSession } from './services/draft/DraftSession';
 import { LcuDraftDetector } from './services/draft/LcuDraftDetector';
+import { LiveMatchTracker } from './services/ingame/LiveMatchTracker';
 
 let mainWindow: BrowserWindow | null = null;
 const lcuConnector = new LcuConnector();
 const riotClient = new RiotApiClient();
 const draftSession = new DraftSession();
+const liveTracker = new LiveMatchTracker();
 let dataDragon: DataDragonManager | null = null;
 
 function createWindow() {
@@ -222,6 +224,20 @@ function registerIpcHandlers() {
 
   // ── Draft ─────────────────────────────────────────────────────────────────
   ipcMain.handle('draft:get-state', () => draftSession.getState());
+
+  // ── In-Game Coach ─────────────────────────────────────────────────────────
+  ipcMain.handle('ingame:start', () => { liveTracker.start(); return { ok: true }; });
+  ipcMain.handle('ingame:stop',  () => { liveTracker.stop();  return { ok: true }; });
+}
+
+function wireIngameEvents() {
+  liveTracker.on('gameStarted',  s   => mainWindow?.webContents.send('ingame:game-started', s));
+  liveTracker.on('stateUpdated', s   => mainWindow?.webContents.send('ingame:state-updated', s));
+  liveTracker.on('gameEnded',    ()  => mainWindow?.webContents.send('ingame:game-ended'));
+  liveTracker.on('threatsUpdated', t => mainWindow?.webContents.send('ingame:threats', t));
+  liveTracker.on('itemsUpdated', r   => mainWindow?.webContents.send('ingame:items', r));
+  liveTracker.on('tipsUpdated',  t   => mainWindow?.webContents.send('ingame:tips', t));
+  liveTracker.on('newEvents',    e   => mainWindow?.webContents.send('ingame:events', e));
 }
 
 function wireDraftEvents() {
@@ -238,6 +254,7 @@ function wireDraftEvents() {
 
 app.whenReady().then(async () => {
   registerIpcHandlers();
+  wireIngameEvents();
   wireDraftEvents();
   createWindow();
 
@@ -260,6 +277,13 @@ app.whenReady().then(async () => {
 
   // Start draft detector (wires LCU events → draftSession)
   new LcuDraftDetector(lcuConnector, draftSession);
+
+  // Auto-start in-game tracker when draft finishes (game is loading)
+  draftSession.on('stateChanged', (s: any) => {
+    if (s.phase === 'finished') {
+      liveTracker.start();
+    }
+  });
 
   lcuConnector.on('connect', () => {
     mainWindow?.webContents.send('lcu-status', 'connected');

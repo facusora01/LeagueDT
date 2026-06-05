@@ -37,6 +37,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ── DataDragon ────────────────────────────────────────────────────────────
   getDDVersion: () => ipcRenderer.invoke('datadragon:version'),
 
+  // ── In-Game Coach ─────────────────────────────────────────────────────────
+  startIngameCoach: () => ipcRenderer.invoke('ingame:start'),
+  stopIngameCoach:  () => ipcRenderer.invoke('ingame:stop'),
+  onGameStarted:    (cb: (s: any) => void) => ipcRenderer.on('ingame:game-started',  (_e, s) => cb(s)),
+  onGameStateUpdate:(cb: (s: any) => void) => ipcRenderer.on('ingame:state-updated', (_e, s) => cb(s)),
+  onGameEnded:      (cb: () => void)       => ipcRenderer.on('ingame:game-ended',     () => cb()),
+  onThreatsUpdate:  (cb: (t: any[]) => void) => ipcRenderer.on('ingame:threats', (_e, t) => cb(t)),
+  onItemsUpdate:    (cb: (r: any) => void)   => ipcRenderer.on('ingame:items',   (_e, r) => cb(r)),
+  onTipsUpdate:     (cb: (t: any[]) => void) => ipcRenderer.on('ingame:tips',    (_e, t) => cb(t)),
+  onGameEvents:     (cb: (e: any[]) => void) => ipcRenderer.on('ingame:events',  (_e, e) => cb(e)),
+
   // ── Draft ─────────────────────────────────────────────────────────────────
   getDraftState: () => ipcRenderer.invoke('draft:get-state'),
   onDraftStateChanged: (cb: (state: any) => void) =>
