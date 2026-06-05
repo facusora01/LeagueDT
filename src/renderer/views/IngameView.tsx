@@ -17,7 +17,11 @@ export const IngameView: React.FC = () => {
     api.onThreatsUpdate(setThreats);
     api.onItemsUpdate(setBuild);
     api.onTipsUpdate(newTips =>
-      setTips(prev => [...newTips, ...prev].slice(0, 8)),
+      setTips(prev => {
+        const merged = [...newTips, ...prev];
+        const seen = new Set<string>();
+        return merged.filter(t => (seen.has(t.id) ? false : seen.add(t.id))).slice(0, 8);
+      }),
     );
   }, []);
 

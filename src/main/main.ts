@@ -245,7 +245,7 @@ function registerIpcHandlers() {
     const session = phase === 'ban'
       ? mockBanPhaseSession(ids)
       : mockChampSelectSession(ids);
-    draftSession.updateFromLcu(session);
+    draftSession.simulate(session);
     return { ok: true };
   });
 
@@ -256,7 +256,7 @@ function registerIpcHandlers() {
 
   ipcMain.handle('dev:stop-sim', () => {
     liveTracker.stop();
-    draftSession.reset();
+    draftSession.reset(true);
     return { ok: true };
   });
 }

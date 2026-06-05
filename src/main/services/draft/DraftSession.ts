@@ -34,6 +34,7 @@ export class DraftSession extends EventEmitter {
   private allChampions: ChampionData[] = [];
   private masteries: MasteryData[] = [];
   private highPriorityMeta: number[] = [];
+  private simulating = false;
 
   setStaticData(champions: ChampionData[], masteries: MasteryData[], meta: number[] = []) {
     this.allChampions = champions;
@@ -43,6 +44,18 @@ export class DraftSession extends EventEmitter {
 
   /** Called by LcuDraftDetector each time the LCU session event fires */
   updateFromLcu(lcuSession: any) {
+    // While simulating, ignore the real client so the poller can't overwrite.
+    if (this.simulating) return;
+    this.applyLcu(lcuSession);
+  }
+
+  /** Dev-only: drive the session from a mock payload and lock out the poller. */
+  simulate(lcuSession: any) {
+    this.simulating = true;
+    this.applyLcu(lcuSession);
+  }
+
+  private applyLcu(lcuSession: any) {
     if (!lcuSession) {
       this.reset();
       return;
@@ -133,7 +146,10 @@ export class DraftSession extends EventEmitter {
     return this.allChampions.find(c => c.id === championId) ?? null;
   }
 
-  reset() {
+  reset(force = false) {
+    // Ignore the real poller's resets while a simulation is active.
+    if (this.simulating && !force) return;
+    this.simulating = false;
     this.state = {
       phase: 'idle',
       allyPicks: [],
