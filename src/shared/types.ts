@@ -1,11 +1,29 @@
 // ─── Electron IPC API ────────────────────────────────────────────────────────
 
 export interface ElectronAPI {
+  // Core
   ping: () => Promise<string>;
   getLcuStatus: () => Promise<'connected' | 'disconnected'>;
+  onLcuStatusChange: (cb: (status: 'connected' | 'disconnected') => void) => void;
+  // Settings
   getSettings: () => Promise<any>;
   updateSettings: (settings: any) => Promise<any>;
-  onLcuStatusChange: (callback: (status: 'connected' | 'disconnected') => void) => void;
+  // Riot API
+  setApiKey: (key: string) => Promise<{ ok: boolean }>;
+  // Summoner
+  searchSummoner: (name: string, tag: string, region: string) => Promise<Summoner>;
+  getAllSummoners: () => Promise<Summoner[]>;
+  // Mastery
+  syncMastery: (summonerId: string) => Promise<{ synced: number }>;
+  getMastery: (summonerId: string) => Promise<ChampionMastery[]>;
+  // Champions
+  getAllChampions: () => Promise<Champion[]>;
+  getChampionById: (id: number) => Promise<Champion | null>;
+  // Match History
+  syncMatches: (summonerId: string, count?: number) => Promise<{ found: number; saved: number }>;
+  getMatches: (summonerId: string, limit?: number) => Promise<any[]>;
+  // DataDragon
+  getDDVersion: () => Promise<string | null>;
 }
 
 declare global {

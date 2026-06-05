@@ -1,12 +1,39 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { ElectronAPI } from '../shared/types';
 
 contextBridge.exposeInMainWorld('electronAPI', {
+  // ── Core ──────────────────────────────────────────────────────────────────
   ping: () => ipcRenderer.invoke('ping'),
   getLcuStatus: () => ipcRenderer.invoke('get-lcu-status'),
+  onLcuStatusChange: (cb: (s: 'connected' | 'disconnected') => void) => {
+    ipcRenderer.on('lcu-status', (_e, status) => cb(status));
+  },
+
+  // ── Settings ──────────────────────────────────────────────────────────────
   getSettings: () => ipcRenderer.invoke('db:get-settings'),
-  updateSettings: (settings: any) => ipcRenderer.invoke('db:update-settings', settings),
-  onLcuStatusChange: (callback: (status: 'connected' | 'disconnected') => void) => {
-    ipcRenderer.on('lcu-status', (_event, status) => callback(status));
-  }
+  updateSettings: (s: any) => ipcRenderer.invoke('db:update-settings', s),
+
+  // ── Riot API ──────────────────────────────────────────────────────────────
+  setApiKey: (key: string) => ipcRenderer.invoke('riot:set-api-key', key),
+
+  // ── Summoner ──────────────────────────────────────────────────────────────
+  searchSummoner: (name: string, tag: string, region: string) =>
+    ipcRenderer.invoke('summoner:search', name, tag, region),
+  getAllSummoners: () => ipcRenderer.invoke('summoner:get-all'),
+
+  // ── Mastery ───────────────────────────────────────────────────────────────
+  syncMastery: (summonerId: string) => ipcRenderer.invoke('mastery:sync', summonerId),
+  getMastery: (summonerId: string) => ipcRenderer.invoke('mastery:get', summonerId),
+
+  // ── Champions ─────────────────────────────────────────────────────────────
+  getAllChampions: () => ipcRenderer.invoke('champions:get-all'),
+  getChampionById: (id: number) => ipcRenderer.invoke('champions:get-by-id', id),
+
+  // ── Match History ─────────────────────────────────────────────────────────
+  syncMatches: (summonerId: string, count?: number) =>
+    ipcRenderer.invoke('matches:sync', summonerId, count),
+  getMatches: (summonerId: string, limit?: number) =>
+    ipcRenderer.invoke('matches:get', summonerId, limit),
+
+  // ── DataDragon ────────────────────────────────────────────────────────────
+  getDDVersion: () => ipcRenderer.invoke('datadragon:version'),
 });

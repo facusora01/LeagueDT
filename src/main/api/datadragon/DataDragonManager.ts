@@ -1,6 +1,11 @@
 import axios from 'axios';
 import * as fs from 'fs';
 import * as path from 'path';
+import { ChampionRepository } from '../../database/repositories/ChampionRepository';
+import { ItemRepository } from '../../database/repositories/ItemRepository';
+import type { Champion, Item } from '../../../shared/types';
+
+const DD_BASE = 'https://ddragon.leagueoflegends.com';
 
 export class DataDragonManager {
   private cacheDir: string;
@@ -14,67 +19,139 @@ export class DataDragonManager {
     }
   }
 
-  /**
-   * Initializes the manager by finding the latest version and downloading base data
-   */
-  public async initialize() {
+  async initialize() {
     try {
-      // Get latest versions
-      const response = await axios.get('https://ddragon.leagueoflegends.com/api/versions.json');
-      const versions = response.data;
-      if (versions && versions.length > 0) {
-        this.currentVersion = versions[0];
-        console.log(`[DataDragon] Latest version is ${this.currentVersion}`);
-        
-        // Ensure we have champions and items cached for this version
-        await this.syncData('champion');
-        await this.syncData('item');
-      }
+      const { data: versions } = await axios.get<string[]>(`${DD_BASE}/api/versions.json`);
+      if (!versions?.length) return;
+
+      this.currentVersion = versions[0];
+      console.log(`[DataDragon] Latest version: ${this.currentVersion}`);
+
+      await Promise.all([
+        this.syncAndSeedChampions(),
+        this.syncAndSeedItems(),
+        this.syncRunes(),
+      ]);
     } catch (err) {
       console.error('[DataDragon] Initialization failed:', err);
     }
   }
 
-  private async syncData(dataType: 'champion' | 'item' | 'runesReforged') {
-    if (!this.currentVersion) return;
-    
-    const filePath = path.join(this.cacheDir, `${dataType}_${this.currentVersion}_${this.language}.json`);
-    
-    // Check if we already have it cached
+  private async fetchOrCache<T>(dataType: string): Promise<T | null> {
+    if (!this.currentVersion) return null;
+
+    const filePath = path.join(
+      this.cacheDir,
+      `${dataType}_${this.currentVersion}_${this.language}.json`,
+    );
+
     if (fs.existsSync(filePath)) {
-      return;
+      try {
+        return JSON.parse(fs.readFileSync(filePath, 'utf8')) as T;
+      } catch {
+        // corrupt cache — re-download
+      }
     }
 
     try {
-      console.log(`[DataDragon] Downloading ${dataType} data for ${this.currentVersion}...`);
-      const url = `https://ddragon.leagueoflegends.com/cdn/${this.currentVersion}/data/${this.language}/${dataType}.json`;
-      const response = await axios.get(url);
-      
-      fs.writeFileSync(filePath, JSON.stringify(response.data), 'utf8');
-      console.log(`[DataDragon] Saved ${dataType} to cache.`);
+      const url = `${DD_BASE}/cdn/${this.currentVersion}/data/${this.language}/${dataType}.json`;
+      const { data } = await axios.get<T>(url);
+      fs.writeFileSync(filePath, JSON.stringify(data), 'utf8');
+      console.log(`[DataDragon] Downloaded & cached ${dataType}`);
+      return data;
     } catch (err) {
-      console.error(`[DataDragon] Failed to sync ${dataType}:`, err);
+      console.error(`[DataDragon] Failed to fetch ${dataType}:`, err);
+      return null;
     }
   }
 
-  public getCachedData(dataType: 'champion' | 'item' | 'runesReforged'): any | null {
+  private async syncAndSeedChampions() {
+    const dbVersion = await ChampionRepository.getVersion();
+    if (dbVersion === this.currentVersion) {
+      console.log('[DataDragon] Champions up to date in DB');
+      return;
+    }
+
+    const raw = await this.fetchOrCache<any>('champion');
+    if (!raw?.data) return;
+
+    const champions: Champion[] = Object.values(raw.data).map((c: any) => ({
+      id: Number(c.key),
+      key: c.id,
+      name: c.name,
+      title: c.title,
+      blurb: c.blurb,
+      tags: c.tags,
+      info: c.info,
+      stats: c.stats,
+      version: this.currentVersion!,
+    }));
+
+    await ChampionRepository.upsertMany(champions);
+    console.log(`[DataDragon] Seeded ${champions.length} champions to DB`);
+  }
+
+  private async syncAndSeedItems() {
+    const raw = await this.fetchOrCache<any>('item');
+    if (!raw?.data) return;
+
+    const items: Item[] = Object.entries(raw.data)
+      .map(([idStr, i]: [string, any]) => ({
+        id: Number(idStr),
+        name: i.name ?? '',
+        description: i.description ?? '',
+        plaintext: i.plaintext ?? '',
+        into: i.into?.map(Number) ?? [],
+        from: i.from?.map(Number) ?? [],
+        gold: {
+          base: i.gold?.base ?? 0,
+          total: i.gold?.total ?? 0,
+          sell: i.gold?.sell ?? 0,
+          purchaseable: i.gold?.purchasable ?? true,
+        },
+        tags: i.tags ?? [],
+        stats: i.stats ?? {},
+        version: this.currentVersion!,
+      }))
+      .filter(i => i.name); // skip blank items
+
+    await ItemRepository.upsertMany(items);
+    console.log(`[DataDragon] Seeded ${items.length} items to DB`);
+  }
+
+  private async syncRunes() {
+    // Runes are read from cache; DB seeding deferred until RuneRepository exists
+    await this.fetchOrCache<any>('runesReforged');
+  }
+
+  // ── Accessors ─────────────────────────────────────────────────────────────
+
+  getCachedData(dataType: 'champion' | 'item' | 'runesReforged'): any | null {
     if (!this.currentVersion) return null;
-    
-    const filePath = path.join(this.cacheDir, `${dataType}_${this.currentVersion}_${this.language}.json`);
-    if (fs.existsSync(filePath)) {
-      try {
-        const content = fs.readFileSync(filePath, 'utf8');
-        return JSON.parse(content);
-      } catch (err) {
-        console.error(`[DataDragon] Failed to read cached ${dataType}:`, err);
-        return null;
-      }
+    const filePath = path.join(
+      this.cacheDir,
+      `${dataType}_${this.currentVersion}_${this.language}.json`,
+    );
+    if (!fs.existsSync(filePath)) return null;
+    try {
+      return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    } catch {
+      return null;
     }
-    return null;
   }
 
-  public getChampionSquareUrl(championId: string): string {
+  getChampionSquareUrl(championKey: string): string {
     if (!this.currentVersion) return '';
-    return `https://ddragon.leagueoflegends.com/cdn/${this.currentVersion}/img/champion/${championId}.png`;
+    return `${DD_BASE}/cdn/${this.currentVersion}/img/champion/${championKey}.png`;
+  }
+
+  getItemIconUrl(itemId: number): string {
+    if (!this.currentVersion) return '';
+    return `${DD_BASE}/cdn/${this.currentVersion}/img/item/${itemId}.png`;
+  }
+
+  getProfileIconUrl(iconId: number): string {
+    if (!this.currentVersion) return '';
+    return `${DD_BASE}/cdn/${this.currentVersion}/img/profileicon/${iconId}.png`;
   }
 }
