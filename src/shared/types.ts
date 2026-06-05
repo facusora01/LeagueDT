@@ -9,7 +9,7 @@ export interface ElectronAPI {
   getSettings: () => Promise<any>;
   updateSettings: (settings: any) => Promise<any>;
   // Riot API
-  setApiKey: (key: string) => Promise<{ ok: boolean }>;
+  setApiKey: (key: string) => Promise<{ ok: boolean; validity: 'valid' | 'invalid' | 'unknown' }>;
   // Summoner
   searchSummoner: (name: string, tag: string, region: string) => Promise<Summoner>;
   getAllSummoners: () => Promise<Summoner[]>;

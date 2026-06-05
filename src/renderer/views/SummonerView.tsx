@@ -6,9 +6,18 @@ import type { Summoner, ChampionMastery } from '../../shared/types';
 
 const REGIONS = ['LA2', 'LA1', 'NA1', 'BR1', 'EUW1', 'EUN1', 'KR', 'JP1'];
 
+const KeyStatus: React.FC<{ status: string; hasStored: boolean }> = ({ status, hasStored }) => {
+  if (status === 'checking') return <span className="text-xs text-text-muted">Validando…</span>;
+  if (status === 'valid') return <span className="text-xs text-success">✓ Válida</span>;
+  if (status === 'invalid') return <span className="text-xs text-destructive">✗ Inválida o expirada</span>;
+  if (status === 'unknown') return <span className="text-xs text-warning">Guardada (no se pudo validar)</span>;
+  if (hasStored) return <span className="text-xs text-text-muted">Hay una key guardada</span>;
+  return <></>;
+};
+
 export const SummonerView: React.FC = () => {
   const [apiKey, setApiKey] = useState('');
-  const [keySaved, setKeySaved] = useState(false);
+  const [keyStatus, setKeyStatus] = useState<'idle' | 'checking' | 'valid' | 'invalid' | 'unknown'>('idle');
   const [hasStoredKey, setHasStoredKey] = useState(false);
   const [gameName, setGameName] = useState('');
   const [tagLine, setTagLine] = useState('');
@@ -37,10 +46,10 @@ export const SummonerView: React.FC = () => {
 
   async function saveKey() {
     if (!apiKey.trim()) return;
-    await api.setApiKey(apiKey.trim());
-    setKeySaved(true);
-    setHasStoredKey(true);
-    setTimeout(() => setKeySaved(false), 2000);
+    setKeyStatus('checking');
+    const res = await api.setApiKey(apiKey.trim());
+    setKeyStatus(res.validity);
+    if (res.validity !== 'invalid') setHasStoredKey(true);
   }
 
   async function search() {
@@ -71,15 +80,7 @@ export const SummonerView: React.FC = () => {
     <div className="space-y-4 max-w-3xl">
       {/* API Key */}
       <Card className="p-4">
-        <SectionTitle
-          right={
-            keySaved ? (
-              <span className="text-xs text-success">✓ Guardada</span>
-            ) : hasStoredKey ? (
-              <span className="text-xs text-text-muted">Hay una key guardada</span>
-            ) : undefined
-          }
-        >
+        <SectionTitle right={<KeyStatus status={keyStatus} hasStored={hasStoredKey} />}>
           Riot API Key
         </SectionTitle>
         <div className="flex gap-2">

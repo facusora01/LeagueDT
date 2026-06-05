@@ -61,8 +61,12 @@ function registerIpcHandlers() {
   // ── API Key ───────────────────────────────────────────────────────────────
   ipcMain.handle('riot:set-api-key', async (_e, key: string) => {
     riotClient.setApiKey(key);
-    await SettingsRepository.updateSettings({ apiKey: key });
-    return { ok: true };
+    const validity = await riotClient.validateKey();
+    // Only persist a key that isn't outright rejected.
+    if (validity !== 'invalid') {
+      await SettingsRepository.updateSettings({ apiKey: key });
+    }
+    return { ok: true, validity };
   });
 
   // ── Summoner ──────────────────────────────────────────────────────────────

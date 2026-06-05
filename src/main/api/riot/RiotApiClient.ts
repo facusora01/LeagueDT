@@ -173,6 +173,24 @@ export class RiotApiClient {
     }
   }
 
+  // ── Key validation ────────────────────────────────────────────────────────
+
+  /**
+   * Checks the current key against a cheap authenticated endpoint.
+   * Returns 'valid' | 'invalid' | 'unknown' (network/other error).
+   */
+  async validateKey(region: RiotRegion = RiotRegion.LA2): Promise<'valid' | 'invalid' | 'unknown'> {
+    if (!this.apiKey) return 'invalid';
+    try {
+      await this.client.get(this.buildUrl(region, '/lol/status/v4/platform-data'));
+      return 'valid';
+    } catch (err) {
+      const status = (err as AxiosError).response?.status;
+      if (status === 401 || status === 403) return 'invalid';
+      return 'unknown';
+    }
+  }
+
   // ── Account v1 ────────────────────────────────────────────────────────────
 
   async getAccountByRiotId(
