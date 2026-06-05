@@ -1,56 +1,71 @@
 import { PrismaClient } from '@prisma/client';
+import { PrismaLibSql } from '@prisma/adapter-libsql';
 import { app } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 
-let prisma: PrismaClient | null = null;
+// Promise-based singleton: assigned synchronously so parallel callers
+// share one in-flight construction instead of each building a new client.
+let prismaPromise: Promise<PrismaClient> | null = null;
 
 export class DatabaseClient {
-  public static async getInstance(): Promise<PrismaClient> {
-    if (prisma) return prisma;
+  static getInstance(): Promise<PrismaClient> {
+    if (!prismaPromise) {
+      prismaPromise = DatabaseClient.create();
+    }
+    return prismaPromise;
+  }
 
+  private static async create(): Promise<PrismaClient> {
     const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
-    
-    // In production, the appPath is where the ASAR bundle is.
-    // userData is where we have write access.
-    const userDataPath = app.getPath('userData');
-    const dbPath = path.join(userDataPath, 'database.sqlite');
 
-    if (!fs.existsSync(dbPath)) {
-      console.log('[DB] No database found in userData. Copying default dev.db...');
-      const sourceDb = isDev 
-        ? path.join(app.getAppPath(), 'prisma', 'dev.db')
-        : path.join(process.resourcesPath, 'prisma', 'dev.db');
-        
-      if (fs.existsSync(sourceDb)) {
-        fs.copyFileSync(sourceDb, dbPath);
-        console.log('[DB] Database copied successfully.');
-      } else {
-        console.error('[DB] Default dev.db not found at', sourceDb);
+    let dbPath: string;
+
+    if (isDev) {
+      // Dev: use the project-root dev.db that `prisma migrate` writes to,
+      // so migrations and the running app share the same database.
+      dbPath = path.join(app.getAppPath(), 'dev.db');
+    } else {
+      // Prod: copy the bundled DB into userData (writable) on first launch.
+      const userDataPath = app.getPath('userData');
+      dbPath = path.join(userDataPath, 'database.sqlite');
+
+      if (!fs.existsSync(dbPath)) {
+        const sourceDb = path.join(process.resourcesPath, 'prisma', 'dev.db');
+        if (fs.existsSync(sourceDb)) {
+          fs.copyFileSync(sourceDb, dbPath);
+          console.log('[DB] Copied bundled database to userData.');
+        } else {
+          console.error('[DB] Bundled dev.db not found at', sourceDb);
+        }
       }
     }
 
+    // libsql expects forward slashes in file: URLs, even on Windows.
+    const url = `file:${dbPath.replace(/\\/g, '/')}`;
     console.log('[DB] Connecting to database at', dbPath);
 
-    // Override the datasource URL via environment variable for Prisma
-    process.env.DATABASE_URL = `file:${dbPath}`;
-
-    prisma = new PrismaClient();
+    // Prisma 7 requires a driver adapter. libsql ships ABI-stable N-API
+    // prebuilds, so it loads under Electron without a native rebuild.
+    const adapter = new PrismaLibSql({ url });
+    const client = new PrismaClient({ adapter });
 
     try {
-      await prisma.$connect();
+      await client.$connect();
       console.log('[DB] Database connected successfully.');
     } catch (e) {
       console.error('[DB] Database connection error:', e);
+      throw e;
     }
 
-    return prisma;
+    return client;
   }
 
-  public static async close() {
-    if (prisma) {
-      await prisma.$disconnect();
-      prisma = null;
+  static async close() {
+    if (prismaPromise) {
+      const client = await prismaPromise;
+      await client.$disconnect();
+      prismaPromise = null;
     }
   }
 }

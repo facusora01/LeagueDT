@@ -167,8 +167,13 @@ export class LcuConnector extends EventEmitter {
       this.handleDisconnect();
     });
 
-    this.ws.on('error', (err) => {
-      console.error('LCU WebSocket error:', err);
+    this.ws.on('error', (err: NodeJS.ErrnoException) => {
+      // ECONNREFUSED is expected while the client is still booting — the
+      // lockfile exists but the WS port isn't accepting connections yet.
+      // Stay quiet and let the next poll retry.
+      if (err.code !== 'ECONNREFUSED') {
+        console.error('[LCU] WebSocket error:', err.message);
+      }
       this.handleDisconnect();
     });
   }

@@ -2,38 +2,51 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SettingsRepository = void 0;
 const DatabaseClient_1 = require("../DatabaseClient");
-// We'll use a hardcoded default summoner ID for local settings since 
-// the user might not be logged in yet.
-const LOCAL_USER_ID = 'local_user';
+// App-level settings don't belong to a real summoner.
+// We upsert a placeholder summoner so the FK is always satisfied.
+const LOCAL_SUMMONER_ID = 'local_user';
+async function ensureLocalSummoner() {
+    const prisma = await DatabaseClient_1.DatabaseClient.getInstance();
+    const exists = await prisma.summoner.findUnique({ where: { id: LOCAL_SUMMONER_ID } });
+    if (!exists) {
+        await prisma.summoner.create({
+            data: {
+                id: LOCAL_SUMMONER_ID,
+                puuid: 'local_user_puuid',
+                accountId: 'local_user_account',
+                summonerId: 'local_user_summoner',
+                name: 'Local',
+                tagLine: 'APP',
+                profileIconId: 0,
+                level: 0,
+                region: 'LA2',
+                lastUpdated: new Date(),
+            },
+        });
+    }
+}
 class SettingsRepository {
     static async getSettings() {
+        await ensureLocalSummoner();
         const prisma = await DatabaseClient_1.DatabaseClient.getInstance();
         let settings = await prisma.userPreference.findUnique({
-            where: { summonerId: LOCAL_USER_ID }
+            where: { summonerId: LOCAL_SUMMONER_ID },
         });
-        // Create default if not exists
         if (!settings) {
             settings = await prisma.userPreference.create({
-                data: {
-                    summonerId: LOCAL_USER_ID,
-                    theme: 'dark',
-                    language: 'es_AR'
-                }
+                data: { summonerId: LOCAL_SUMMONER_ID, theme: 'dark', language: 'es_AR' },
             });
         }
         return settings;
     }
     static async updateSettings(data) {
+        await ensureLocalSummoner();
         const prisma = await DatabaseClient_1.DatabaseClient.getInstance();
-        const settings = await prisma.userPreference.upsert({
-            where: { summonerId: LOCAL_USER_ID },
+        return prisma.userPreference.upsert({
+            where: { summonerId: LOCAL_SUMMONER_ID },
             update: data,
-            create: {
-                summonerId: LOCAL_USER_ID,
-                ...data
-            }
+            create: { summonerId: LOCAL_SUMMONER_ID, ...data },
         });
-        return settings;
     }
 }
 exports.SettingsRepository = SettingsRepository;

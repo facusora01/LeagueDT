@@ -35,49 +35,65 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DatabaseClient = void 0;
 const client_1 = require("@prisma/client");
+const adapter_libsql_1 = require("@prisma/adapter-libsql");
 const electron_1 = require("electron");
 const path = __importStar(require("path"));
 const fs = __importStar(require("fs"));
-let prisma = null;
+// Promise-based singleton: assigned synchronously so parallel callers
+// share one in-flight construction instead of each building a new client.
+let prismaPromise = null;
 class DatabaseClient {
-    static async getInstance() {
-        if (prisma)
-            return prisma;
+    static getInstance() {
+        if (!prismaPromise) {
+            prismaPromise = DatabaseClient.create();
+        }
+        return prismaPromise;
+    }
+    static async create() {
         const isDev = process.env.NODE_ENV === 'development' || !electron_1.app.isPackaged;
-        // In production, the appPath is where the ASAR bundle is.
-        // userData is where we have write access.
-        const userDataPath = electron_1.app.getPath('userData');
-        const dbPath = path.join(userDataPath, 'database.sqlite');
-        if (!fs.existsSync(dbPath)) {
-            console.log('[DB] No database found in userData. Copying default dev.db...');
-            const sourceDb = isDev
-                ? path.join(electron_1.app.getAppPath(), 'prisma', 'dev.db')
-                : path.join(process.resourcesPath, 'prisma', 'dev.db');
-            if (fs.existsSync(sourceDb)) {
-                fs.copyFileSync(sourceDb, dbPath);
-                console.log('[DB] Database copied successfully.');
-            }
-            else {
-                console.error('[DB] Default dev.db not found at', sourceDb);
+        let dbPath;
+        if (isDev) {
+            // Dev: use the project-root dev.db that `prisma migrate` writes to,
+            // so migrations and the running app share the same database.
+            dbPath = path.join(electron_1.app.getAppPath(), 'dev.db');
+        }
+        else {
+            // Prod: copy the bundled DB into userData (writable) on first launch.
+            const userDataPath = electron_1.app.getPath('userData');
+            dbPath = path.join(userDataPath, 'database.sqlite');
+            if (!fs.existsSync(dbPath)) {
+                const sourceDb = path.join(process.resourcesPath, 'prisma', 'dev.db');
+                if (fs.existsSync(sourceDb)) {
+                    fs.copyFileSync(sourceDb, dbPath);
+                    console.log('[DB] Copied bundled database to userData.');
+                }
+                else {
+                    console.error('[DB] Bundled dev.db not found at', sourceDb);
+                }
             }
         }
+        // libsql expects forward slashes in file: URLs, even on Windows.
+        const url = `file:${dbPath.replace(/\\/g, '/')}`;
         console.log('[DB] Connecting to database at', dbPath);
-        // Override the datasource URL via environment variable for Prisma
-        process.env.DATABASE_URL = `file:${dbPath}`;
-        prisma = new client_1.PrismaClient();
+        // Prisma 7 requires a driver adapter. libsql ships ABI-stable N-API
+        // prebuilds, so it loads under Electron without a native rebuild.
+        const adapter = new adapter_libsql_1.PrismaLibSql({ url });
+        const client = new client_1.PrismaClient({ adapter });
         try {
-            await prisma.$connect();
+            await client.$connect();
             console.log('[DB] Database connected successfully.');
         }
         catch (e) {
             console.error('[DB] Database connection error:', e);
+            throw e;
         }
-        return prisma;
+        return client;
     }
     static async close() {
-        if (prisma) {
-            await prisma.$disconnect();
-            prisma = null;
+        if (prismaPromise) {
+            const client = await prismaPromise;
+            await client.$disconnect();
+            prismaPromise = null;
         }
     }
 }
