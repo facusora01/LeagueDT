@@ -24,6 +24,113 @@ export interface ElectronAPI {
   getMatches: (summonerId: string, limit?: number) => Promise<any[]>;
   // DataDragon
   getDDVersion: () => Promise<string | null>;
+  // In-Game Coach
+  startIngameCoach: () => Promise<{ ok: boolean }>;
+  stopIngameCoach: () => Promise<{ ok: boolean }>;
+  onGameStarted: (cb: (s: GameStateDTO) => void) => void;
+  onGameStateUpdate: (cb: (s: GameStateDTO) => void) => void;
+  onGameEnded: (cb: () => void) => void;
+  onThreatsUpdate: (cb: (t: ThreatDTO[]) => void) => void;
+  onItemsUpdate: (cb: (r: ItemBuildDTO) => void) => void;
+  onTipsUpdate: (cb: (t: TipDTO[]) => void) => void;
+  onGameEvents: (cb: (e: any[]) => void) => void;
+  // Draft
+  getDraftState: () => Promise<DraftStateDTO>;
+  onDraftStateChanged: (cb: (state: DraftStateDTO) => void) => void;
+  onDraftRecommendations: (cb: (recs: ChampionRecDTO[]) => void) => void;
+  onDraftBanSuggestions: (cb: (bans: BanSugDTO[]) => void) => void;
+}
+
+// ─── Renderer DTOs (shapes pushed over IPC) ──────────────────────────────────
+
+export interface ChampionDataDTO {
+  id: number;
+  name: string;
+  tags: string[];
+}
+
+export interface DraftStateDTO {
+  phase: 'idle' | 'banning' | 'picking' | 'finished';
+  allyPicks: ChampionDataDTO[];
+  enemyPicks: ChampionDataDTO[];
+  allyBans: number[];
+  enemyBans: number[];
+  localCellId: number;
+  isMyTurn: boolean;
+}
+
+export interface ChampionRecDTO {
+  champion: ChampionDataDTO;
+  score: number;
+  reasons: string[];
+  masteryLevel: number;
+  masteryPoints: number;
+  fillsRole: string | null;
+}
+
+export interface BanSugDTO {
+  champion: ChampionDataDTO;
+  score: number;
+  reasons: string[];
+}
+
+export interface LivePlayerDTO {
+  summonerName: string;
+  championName: string;
+  team: 'ORDER' | 'CHAOS';
+  position: string;
+  level: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  cs: number;
+  wardScore: number;
+  items: number[];
+  isDead: boolean;
+  respawnTimer: number;
+  currentGold?: number;
+}
+
+export interface GameStateDTO {
+  gameTime: number;
+  gameMode: string;
+  localPlayer: LivePlayerDTO;
+  allies: LivePlayerDTO[];
+  enemies: LivePlayerDTO[];
+  events: any[];
+  lastUpdated: number;
+}
+
+export interface ThreatDTO {
+  summonerName: string;
+  championName: string;
+  threatLevel: 'low' | 'medium' | 'high' | 'extreme';
+  score: number;
+  reasons: string[];
+  kda: number;
+  estimatedGoldLead: number;
+}
+
+export interface ItemSuggestionDTO {
+  itemId: number;
+  name: string;
+  priority: 'core' | 'situational' | 'defensive';
+  reason: string;
+}
+
+export interface ItemBuildDTO {
+  phase: 'early' | 'mid' | 'late';
+  buildStyle: 'aggressive' | 'defensive' | 'balanced' | 'anti-heal';
+  items: ItemSuggestionDTO[];
+  reasoning: string;
+}
+
+export interface TipDTO {
+  id: string;
+  category: 'macro' | 'micro' | 'vision' | 'timing' | 'threat';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  message: string;
+  expiresAt?: number;
 }
 
 declare global {
