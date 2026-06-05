@@ -21,6 +21,27 @@ model Summoner {
 
   championMasteries ChampionMastery[]
   participants      Participant[]
+  liveParticipants  LiveParticipant[]
+  recommendations   Recommendation[]
+  statistics        UserStatistics?
+  preferences       UserPreference?
+
+  @@index([name, region])
+}
+
+model Champion {
+  id      Int    @id
+  key     String @unique
+  name    String
+  title   String
+  blurb   String
+  tags    String // JSON string of tags array
+  info    String // JSON string of ChampionInfo
+  stats   String // JSON string of ChampionStats
+  version String
+
+  masteries    ChampionMastery[]
+  participants Participant[]
 }
 
 model ChampionMastery {
@@ -33,31 +54,35 @@ model ChampionMastery {
   chestGranted Boolean
   tokensEarned Int
 
-  summoner     Summoner @relation(fields: [summonerId], references: [id])
-  
+  summoner Summoner @relation(fields: [summonerId], references: [id])
+  champion Champion @relation(fields: [championId], references: [id])
+
   @@unique([summonerId, championId])
+  @@index([summonerId])
 }
 
 model Match {
-  id              String   @id
-  gameId          BigInt
-  platformId      String
-  queueId         Int
-  mapId           Int
-  seasonId        Int
-  gameCreation    DateTime
-  gameDuration    Int
-  gameMode        String
-  gameType        String
-  gameVersion     String
-  createdAt       DateTime @default(now())
+  id           String   @id
+  gameId       BigInt
+  platformId   String
+  queueId      Int
+  mapId        Int
+  seasonId     Int
+  gameCreation DateTime
+  gameDuration Int
+  gameMode     String
+  gameType     String
+  gameVersion  String
+  createdAt    DateTime @default(now())
 
-  teams           Team[]
-  participants    Participant[]
+  teams        Team[]
+  participants Participant[]
+
+  @@index([gameCreation, gameMode])
 }
 
 model Team {
-  id              String   @id @default(uuid())
+  id              String @id @default(uuid())
   matchId         String
   teamId          Int
   win             Boolean
@@ -73,11 +98,23 @@ model Team {
   dragonKills     Int
   riftHeraldKills Int
 
-  match           Match    @relation(fields: [matchId], references: [id])
+  match Match         @relation(fields: [matchId], references: [id])
+  bans  ChampionBan[]
+
+  @@index([matchId, teamId])
+}
+
+model ChampionBan {
+  id         String @id @default(uuid())
+  teamId     String
+  championId Int
+  pickTurn   Int
+
+  team Team @relation(fields: [teamId], references: [id])
 }
 
 model Participant {
-  id                          String   @id @default(uuid())
+  id                          String  @id @default(uuid())
   matchId                     String
   teamId                      Int
   championId                  Int
@@ -100,14 +137,151 @@ model Participant {
   neutralMinionsKilled        Int
   teamObjectiveKills          Int
   win                         Boolean
-  
-  items                       String   // JSON string of item IDs
-
+  items                       String  // JSON: number[]
+  perk0                       Int     @default(0)
+  perk1                       Int     @default(0)
+  perk2                       Int     @default(0)
+  perk3                       Int     @default(0)
+  perk4                       Int     @default(0)
+  perk5                       Int     @default(0)
+  perkPrimaryStyle            Int     @default(0)
+  perkSubStyle                Int     @default(0)
+  statPerks                   String  @default("{}") // JSON: StatPerks
   role                        String
   lane                        String
 
-  match                       Match    @relation(fields: [matchId], references: [id])
-  summoner                    Summoner? @relation(fields: [summonerId], references: [id])
+  match    Match     @relation(fields: [matchId], references: [id])
+  summoner Summoner? @relation(fields: [summonerId], references: [id])
+  champion Champion  @relation(fields: [championId], references: [id])
+
+  @@index([summonerId, championId])
+  @@index([matchId, teamId])
+}
+
+model Item {
+  id          Int    @id
+  name        String
+  description String
+  plaintext   String
+  into        String // JSON: number[]
+  from        String // JSON: number[]
+  gold        String // JSON: ItemGold
+  tags        String // JSON: string[]
+  stats       String // JSON: ItemStats
+  version     String
+}
+
+model Rune {
+  id        Int    @id
+  key       String @unique
+  name      String
+  icon      String
+  shortDesc String
+  longDesc  String
+  tier      Int
+  type      String
+  version   String
+}
+
+model LiveMatch {
+  id                 String   @id @default(uuid())
+  gameId             BigInt   @unique
+  mapId              Int
+  gameMode           String
+  gameType           String
+  gameQueueConfigId  Int
+  gameStartTime      DateTime
+  gameLength         Int
+  platformId         String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  participants    LiveParticipant[]
+  bannedChampions LiveChampionBan[]
+
+  @@index([gameId])
+}
+
+model LiveChampionBan {
+  id          String @id @default(uuid())
+  liveMatchId String
+  championId  Int
+  teamId      Int
+  pickTurn    Int
+
+  liveMatch LiveMatch @relation(fields: [liveMatchId], references: [id])
+}
+
+model LiveParticipant {
+  id             String  @id @default(uuid())
+  liveMatchId    String
+  teamId         Int
+  championId     Int
+  summonerId     String
+  summonerName   String
+  spell1Id       Int
+  spell2Id       Int
+  perk0          Int     @default(0)
+  perk1          Int     @default(0)
+  perk2          Int     @default(0)
+  perk3          Int     @default(0)
+  perk4          Int     @default(0)
+  perk5          Int     @default(0)
+  perkPrimaryStyle Int   @default(0)
+  perkSubStyle   Int     @default(0)
+  isBot          Boolean @default(false)
+  isDead         Boolean @default(false)
+  kills          Int     @default(0)
+  deaths         Int     @default(0)
+  assists        Int     @default(0)
+  goldEarned     Int     @default(0)
+  level          Int     @default(1)
+  items          String  @default("[]") // JSON: number[]
+
+  liveMatch LiveMatch @relation(fields: [liveMatchId], references: [id])
+  summoner  Summoner  @relation(fields: [summonerId], references: [id])
+}
+
+model Recommendation {
+  id          String   @id @default(uuid())
+  summonerId  String
+  type        String   // RecommendationType enum value
+  context     String   // RecommendationContext enum value
+  priority    Int
+  title       String
+  description String
+  reasoning   String
+  data        String   @default("{}") // JSON
+  confidence  Float
+  timestamp   DateTime @default(now())
+  dismissed   Boolean  @default(false)
+  actedUpon   Boolean  @default(false)
+  matchId     String?
+
+  summoner Summoner @relation(fields: [summonerId], references: [id])
+
+  @@index([summonerId, timestamp])
+  @@index([summonerId, type])
+}
+
+model UserStatistics {
+  id                    String   @id @default(uuid())
+  summonerId            String   @unique
+  totalMatches          Int      @default(0)
+  wins                  Int      @default(0)
+  losses                Int      @default(0)
+  winRate               Float    @default(0)
+  averageKDA            Float    @default(0)
+  averageCSPerMinute    Float    @default(0)
+  averageGoldPerMinute  Float    @default(0)
+  averageDamagePerMinute Float   @default(0)
+  averageVisionScore    Float    @default(0)
+  mostPlayedChampions   String   @default("[]")  // JSON: ChampionStats[]
+  roleDistribution      String   @default("{}") // JSON: RoleDistribution
+  improvementTrend      Float    @default(0)
+  lastUpdated           DateTime @updatedAt
+
+  summoner Summoner @relation(fields: [summonerId], references: [id])
 }
 
 model UserPreference {
@@ -124,4 +298,6 @@ model UserPreference {
   region               String   @default("LA2")
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+
+  summoner Summoner @relation(fields: [summonerId], references: [id])
 }
