@@ -41,6 +41,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ── DataDragon ────────────────────────────────────────────────────────────
   getDDVersion: () => ipcRenderer.invoke('datadragon:version'),
 
+  // ── Dev simulation ────────────────────────────────────────────────────────
+  simulateDraft: (phase: 'pick' | 'ban') => ipcRenderer.invoke('dev:simulate-draft', phase),
+  simulateGame: () => ipcRenderer.invoke('dev:simulate-game'),
+  stopSimulation: () => ipcRenderer.invoke('dev:stop-sim'),
+
   // ── In-Game Coach ─────────────────────────────────────────────────────────
   startIngameCoach: () => ipcRenderer.invoke('ingame:start'),
   stopIngameCoach:  () => ipcRenderer.invoke('ingame:stop'),

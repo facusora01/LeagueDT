@@ -29,14 +29,22 @@ export const IngameView: React.FC = () => {
             <h2 className="text-lg font-bold text-text-primary">En Partida</h2>
             <p className="text-sm text-text-secondary">El coach se activa automáticamente al iniciar una partida</p>
           </div>
-          <button
-            onClick={() => api.startIngameCoach()}
-            className="px-4 py-2 bg-primary/20 text-primary border border-primary/30 rounded-md text-sm hover:bg-primary/30 transition-colors"
-          >
-            Forzar inicio
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => api.simulateGame()}
+              className="px-4 py-2 bg-secondary/20 text-secondary border border-secondary/30 rounded-md text-sm hover:bg-secondary/30 transition-colors"
+            >
+              Simular partida
+            </button>
+            <button
+              onClick={() => api.startIngameCoach()}
+              className="px-4 py-2 bg-primary/20 text-primary border border-primary/30 rounded-md text-sm hover:bg-primary/30 transition-colors"
+            >
+              Forzar inicio
+            </button>
+          </div>
         </Card>
-        <EmptyState title="No hay partida activa" hint="Entrá a una partida de LoL para ver análisis en vivo" />
+        <EmptyState title="No hay partida activa" hint="Entrá a una partida, o usá 'Simular partida' para probar el coach" />
       </div>
     );
   }

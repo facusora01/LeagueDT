@@ -49,41 +49,55 @@ export class LiveMatchTracker extends EventEmitter {
   private async poll() {
     try {
       const raw = await axios.get(LIVE_CLIENT_URL, { httpsAgent, timeout: 2000 });
-      const state = this.parseState(raw.data);
-
-      if (!this.isTracking) {
-        this.isTracking = true;
-        this.emit('gameStarted', state);
-      }
-
-      this.emit('stateUpdated', state);
-
-      // Emit coach outputs
-      const threats = analyzeEnemyThreats(state.enemies, state.allies);
-      this.emit('threatsUpdated', threats);
-
-      const goldAdv = this.estimateGoldAdvantage(state);
-      const itemInput: ItemInput = {
-        championTags: this.localChampionTags,
-        ownedItemIds: state.localPlayer.items,
-        currentGold: state.localPlayer.currentGold ?? 0,
-        gameTime: state.gameTime,
-        goldAdvantage: goldAdv,
-        enemyADCount: this.countTaggedEnemies(state.enemies, ['Marksman', 'Fighter', 'Assassin']),
-        enemyAPCount: this.countTaggedEnemies(state.enemies, ['Mage']),
-        enemyHasHealing: false, // TODO: detect via champion list
-      };
-      this.emit('itemsUpdated', recommendItems(itemInput));
-
-      const newTips = generateTips(state, this.tipsCtx);
-      if (newTips.length > 0) {
-        this.emit('tipsUpdated', newTips);
-      }
+      this.process(raw.data);
     } catch (err: any) {
       if (err?.response?.status === 404 || err?.code === 'ECONNREFUSED') {
         if (this.isTracking) this.stop();
       }
       // else: transient error, ignore
+    }
+  }
+
+  /**
+   * Dev-only: feed a raw Live Client payload through the full pipeline
+   * without hitting the local API, to test the coach without a real game.
+   */
+  simulate(rawData: any, championTags: string[] = ['Mage']) {
+    this.tipsCtx = createTipsContext();
+    this.lastEventIds.clear();
+    this.localChampionTags = championTags;
+    this.process(rawData);
+  }
+
+  private process(rawData: any) {
+    const state = this.parseState(rawData);
+
+    if (!this.isTracking) {
+      this.isTracking = true;
+      this.emit('gameStarted', state);
+    }
+
+    this.emit('stateUpdated', state);
+
+    const threats = analyzeEnemyThreats(state.enemies, state.allies);
+    this.emit('threatsUpdated', threats);
+
+    const goldAdv = this.estimateGoldAdvantage(state);
+    const itemInput: ItemInput = {
+      championTags: this.localChampionTags,
+      ownedItemIds: state.localPlayer.items,
+      currentGold: state.localPlayer.currentGold ?? 0,
+      gameTime: state.gameTime,
+      goldAdvantage: goldAdv,
+      enemyADCount: this.countTaggedEnemies(state.enemies, ['Marksman', 'Fighter', 'Assassin']),
+      enemyAPCount: this.countTaggedEnemies(state.enemies, ['Mage']),
+      enemyHasHealing: false, // TODO: detect via champion list
+    };
+    this.emit('itemsUpdated', recommendItems(itemInput));
+
+    const newTips = generateTips(state, this.tipsCtx);
+    if (newTips.length > 0) {
+      this.emit('tipsUpdated', newTips);
     }
   }
 

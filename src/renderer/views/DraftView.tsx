@@ -36,11 +36,25 @@ export const DraftView: React.FC = () => {
             {isIdle ? 'Entrá a champion select para ver recomendaciones' : 'Análisis en vivo'}
           </p>
         </div>
-        {state?.isMyTurn && (
-          <span className="px-3 py-1 bg-primary/20 text-primary border border-primary/40 rounded-full text-sm animate-pulse">
-            Tu turno
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {state?.isMyTurn && (
+            <span className="px-3 py-1 bg-primary/20 text-primary border border-primary/40 rounded-full text-sm animate-pulse">
+              Tu turno
+            </span>
+          )}
+          <button
+            onClick={() => api.simulateDraft('pick')}
+            className="px-3 py-1.5 text-xs bg-surface-light text-text-secondary border border-border rounded-md hover:text-text-primary"
+          >
+            Simular picks
+          </button>
+          <button
+            onClick={() => api.simulateDraft('ban')}
+            className="px-3 py-1.5 text-xs bg-surface-light text-text-secondary border border-border rounded-md hover:text-text-primary"
+          >
+            Simular bans
+          </button>
+        </div>
       </Card>
 
       {isIdle && (

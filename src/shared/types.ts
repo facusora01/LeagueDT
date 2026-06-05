@@ -26,6 +26,10 @@ export interface ElectronAPI {
   getMatches: (summonerId: string, limit?: number) => Promise<any[]>;
   // DataDragon
   getDDVersion: () => Promise<string | null>;
+  // Dev simulation
+  simulateDraft: (phase: 'pick' | 'ban') => Promise<{ ok: boolean }>;
+  simulateGame: () => Promise<{ ok: boolean }>;
+  stopSimulation: () => Promise<{ ok: boolean }>;
   // In-Game Coach
   startIngameCoach: () => Promise<{ ok: boolean }>;
   stopIngameCoach: () => Promise<{ ok: boolean }>;

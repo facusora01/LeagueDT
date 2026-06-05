@@ -11,6 +11,7 @@ import { MatchRepository } from './database/repositories/MatchRepository';
 import { DraftSession } from './services/draft/DraftSession';
 import { LcuDraftDetector } from './services/draft/LcuDraftDetector';
 import { LiveMatchTracker } from './services/ingame/LiveMatchTracker';
+import { mockChampSelectSession, mockBanPhaseSession, mockLiveGameData } from './services/dev/mockData';
 
 let mainWindow: BrowserWindow | null = null;
 const lcuConnector = new LcuConnector();
@@ -236,6 +237,28 @@ function registerIpcHandlers() {
   // ── In-Game Coach ─────────────────────────────────────────────────────────
   ipcMain.handle('ingame:start', () => { liveTracker.start(); return { ok: true }; });
   ipcMain.handle('ingame:stop',  () => { liveTracker.stop();  return { ok: true }; });
+
+  // ── Dev simulation (test draft / in-game without a real game) ─────────────
+  ipcMain.handle('dev:simulate-draft', async (_e, phase: 'pick' | 'ban') => {
+    const champs = await ChampionRepository.findAll();
+    const ids = champs.slice(0, 8).map(c => c.id);
+    const session = phase === 'ban'
+      ? mockBanPhaseSession(ids)
+      : mockChampSelectSession(ids);
+    draftSession.updateFromLcu(session);
+    return { ok: true };
+  });
+
+  ipcMain.handle('dev:simulate-game', () => {
+    liveTracker.simulate(mockLiveGameData(), ['Mage']);
+    return { ok: true };
+  });
+
+  ipcMain.handle('dev:stop-sim', () => {
+    liveTracker.stop();
+    draftSession.reset();
+    return { ok: true };
+  });
 }
 
 function wireIngameEvents() {
