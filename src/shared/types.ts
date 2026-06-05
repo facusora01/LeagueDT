@@ -13,6 +13,8 @@ export interface ElectronAPI {
   // Summoner
   searchSummoner: (name: string, tag: string, region: string) => Promise<Summoner>;
   getAllSummoners: () => Promise<Summoner[]>;
+  onCurrentSummoner: (cb: (s: Summoner) => void) => void;
+  onMasterySynced: (cb: (id: string) => void) => void;
   // Mastery
   syncMastery: (summonerId: string) => Promise<{ synced: number }>;
   getMastery: (summonerId: string) => Promise<ChampionMastery[]>;

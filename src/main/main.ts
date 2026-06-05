@@ -112,8 +112,8 @@ function registerIpcHandlers() {
         level: m.championLevel,
         points: m.championPoints,
         lastPlayTime: new Date(m.lastPlayTime),
-        chestGranted: m.chestGranted,
-        tokensEarned: m.tokensEarned,
+        chestGranted: m.chestGranted ?? false,
+        tokensEarned: m.tokensEarned ?? 0,
       })),
     );
 
@@ -260,6 +260,52 @@ function wireDraftEvents() {
   });
 }
 
+// Reads the logged-in account straight from the League client (no API key
+// needed) and persists it, then syncs mastery if a Riot key is available.
+async function loadCurrentSummonerFromLcu() {
+  const current = await lcuConnector.request<any>('/lol-summoner/v1/current-summoner');
+  if (!current?.puuid) return;
+
+  const regionInfo = await lcuConnector.request<any>('/riotclient/region-locale');
+  const region = (regionInfo?.region ?? 'LA2').toLowerCase();
+
+  const saved = await SummonerRepository.upsert({
+    puuid: current.puuid,
+    accountId: current.accountId ? String(current.accountId) : null,
+    summonerId: current.summonerId ? String(current.summonerId) : null,
+    name: current.gameName || current.displayName || 'Invocador',
+    tagLine: current.tagLine ?? '',
+    profileIconId: current.profileIconId ?? 0,
+    level: current.summonerLevel ?? 0,
+    region,
+    lastUpdated: new Date(),
+  });
+
+  mainWindow?.webContents.send('summoner:current', saved);
+
+  // Mastery needs the Riot API; only attempt it if a key is configured.
+  const settings = await SettingsRepository.getSettings();
+  if ((settings as any).apiKey) {
+    try {
+      const masteries = await riotClient.getAllChampionMasteries(region as RiotRegion, current.puuid);
+      await ChampionMasteryRepository.upsertMany(
+        saved.id,
+        masteries.map(m => ({
+          championId: m.championId,
+          level: m.championLevel,
+          points: m.championPoints,
+          lastPlayTime: new Date(m.lastPlayTime),
+          chestGranted: m.chestGranted ?? false,
+          tokensEarned: m.tokensEarned ?? 0,
+        })),
+      );
+      mainWindow?.webContents.send('summoner:mastery-synced', saved.id);
+    } catch (err) {
+      console.error('[LCU] Mastery sync failed:', err);
+    }
+  }
+}
+
 app.whenReady().then(async () => {
   registerIpcHandlers();
   wireIngameEvents();
@@ -295,6 +341,9 @@ app.whenReady().then(async () => {
 
   lcuConnector.on('connect', () => {
     mainWindow?.webContents.send('lcu-status', 'connected');
+    loadCurrentSummonerFromLcu().catch(err =>
+      console.error('[LCU] Failed to load current summoner:', err),
+    );
   });
 
   lcuConnector.on('disconnect', () => {

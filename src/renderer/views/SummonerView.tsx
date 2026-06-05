@@ -35,6 +35,13 @@ export const SummonerView: React.FC = () => {
       }
     });
     api.getSettings().then(s => setHasStoredKey(!!s?.apiKey));
+
+    // Auto-detected account from the running League client
+    api.onCurrentSummoner(s => {
+      setSummoner(s);
+      loadMastery(s.id);
+    });
+    api.onMasterySynced(id => loadMastery(id));
   }, []);
 
   async function loadMastery(summonerId: string) {

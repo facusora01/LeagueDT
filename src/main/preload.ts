@@ -19,6 +19,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   searchSummoner: (name: string, tag: string, region: string) =>
     ipcRenderer.invoke('summoner:search', name, tag, region),
   getAllSummoners: () => ipcRenderer.invoke('summoner:get-all'),
+  onCurrentSummoner: (cb: (s: any) => void) =>
+    ipcRenderer.on('summoner:current', (_e, s) => cb(s)),
+  onMasterySynced: (cb: (id: string) => void) =>
+    ipcRenderer.on('summoner:mastery-synced', (_e, id) => cb(id)),
 
   // ── Mastery ───────────────────────────────────────────────────────────────
   syncMastery: (summonerId: string) => ipcRenderer.invoke('mastery:sync', summonerId),

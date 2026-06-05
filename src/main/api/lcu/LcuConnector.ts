@@ -4,8 +4,11 @@ import { exec } from 'child_process';
 import util from 'util';
 import { EventEmitter } from 'events';
 import WebSocket from 'ws';
+import axios from 'axios';
+import https from 'https';
 
 const execAsync = util.promisify(exec);
+const lcuHttpsAgent = new https.Agent({ rejectUnauthorized: false });
 
 export interface LcuCredentials {
   port: string;
@@ -112,6 +115,26 @@ export class LcuConnector extends EventEmitter {
         // Only log once to avoid spamming
         // console.log(`[LCU] Waiting for lockfile at ${this.lockfilePath}`);
       }
+    }
+  }
+
+  /**
+   * Authenticated GET against the local LCU REST API (same port as the WS).
+   * Returns null if not connected or the request fails.
+   */
+  public async request<T = any>(apiPath: string): Promise<T | null> {
+    if (!this.credentials) return null;
+    const { protocol, port, password } = this.credentials;
+    const auth = Buffer.from(`riot:${password}`).toString('base64');
+    try {
+      const { data } = await axios.get<T>(`${protocol}://127.0.0.1:${port}${apiPath}`, {
+        headers: { Authorization: `Basic ${auth}` },
+        httpsAgent: lcuHttpsAgent,
+        timeout: 3000,
+      });
+      return data;
+    } catch {
+      return null;
     }
   }
 
