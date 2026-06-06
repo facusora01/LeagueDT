@@ -41,15 +41,29 @@ export class LcuDraftDetector {
     console.log('[DraftDetector] Polling stopped');
   }
 
+  private lastLoggedPhase: string | null = null;
+
   private async pollOnce() {
     const creds = this.lcu.credentials;
     if (!creds) return;
 
     try {
       const data = await this.fetchSession(creds);
+      const tphase = data?.timer?.phase ?? 'none';
+      if (tphase !== this.lastLoggedPhase) {
+        console.log(
+          `[DraftDetector] champ-select active — timer.phase=${tphase}, ` +
+          `myTeam=${data?.myTeam?.length ?? 0}, theirTeam=${data?.theirTeam?.length ?? 0}`,
+        );
+        this.lastLoggedPhase = tphase;
+      }
       this.session.updateFromLcu(data);
     } catch (err: any) {
       if (err?.response?.status === 404) {
+        if (this.lastLoggedPhase !== null) {
+          console.log('[DraftDetector] no champ-select (404)');
+          this.lastLoggedPhase = null;
+        }
         // Not in champ select — reset if was active
         if (this.session.getState().phase !== 'idle') {
           this.session.reset();

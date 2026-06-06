@@ -44,7 +44,16 @@ export class DraftSession extends EventEmitter {
 
   /** Called by LcuDraftDetector each time the LCU session event fires */
   updateFromLcu(lcuSession: any) {
-    // While simulating, ignore the real client so the poller can't overwrite.
+    // A real champ-select session always takes precedence — clear any sim.
+    const isRealSession = !!(
+      lcuSession && (Array.isArray(lcuSession.myTeam) || Array.isArray(lcuSession.actions))
+    );
+    if (isRealSession) {
+      this.simulating = false;
+      this.applyLcu(lcuSession);
+      return;
+    }
+    // No real session: keep an active simulation, otherwise apply (resets).
     if (this.simulating) return;
     this.applyLcu(lcuSession);
   }
