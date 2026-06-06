@@ -20,41 +20,49 @@ export class LiveMatchTracker extends EventEmitter {
 
   // Champion tags for local player — set before game starts via setLocalChampionTags()
   private localChampionTags: string[] = [];
+  private simulating = false;
 
   setLocalChampionTags(tags: string[]) {
     this.localChampionTags = tags;
   }
 
+  /** Begins the persistent poll loop. Idempotent — safe to call on app start. */
   start() {
     if (this.pollTimer) return;
-    this.tipsCtx = createTipsContext();
-    this.lastEventIds.clear();
     this.pollTimer = setInterval(() => this.poll(), POLL_INTERVAL_MS);
     this.poll();
-    console.log('[LiveMatchTracker] Started polling');
+    console.log('[LiveMatchTracker] Polling Live Client API (waiting for a game)…');
   }
 
+  /** Fully stops the poll loop (app shutdown). */
   stop() {
     if (this.pollTimer) {
       clearInterval(this.pollTimer);
       this.pollTimer = null;
     }
+    this.endCurrentGame();
+  }
+
+  private endCurrentGame() {
     if (this.isTracking) {
       this.isTracking = false;
       this.emit('gameEnded');
-      console.log('[LiveMatchTracker] Stopped');
+      console.log('[LiveMatchTracker] Game ended');
     }
   }
 
   private async poll() {
     try {
       const raw = await axios.get(LIVE_CLIENT_URL, { httpsAgent, timeout: 2000 });
+      this.simulating = false; // a real game always takes over
       this.process(raw.data);
     } catch (err: any) {
-      if (err?.response?.status === 404 || err?.code === 'ECONNREFUSED') {
-        if (this.isTracking) this.stop();
+      const noGame = err?.response?.status === 404 || err?.code === 'ECONNREFUSED';
+      if (noGame) {
+        if (!this.simulating) this.endCurrentGame();
+      } else {
+        console.error('[LiveMatchTracker] Poll error:', err?.message);
       }
-      // else: transient error, ignore
     }
   }
 
@@ -63,8 +71,8 @@ export class LiveMatchTracker extends EventEmitter {
    * without hitting the local API, to test the coach without a real game.
    */
   simulate(rawData: any, championTags: string[] = ['Mage']) {
-    this.tipsCtx = createTipsContext();
-    this.lastEventIds.clear();
+    this.simulating = true;
+    this.isTracking = false; // force a fresh gameStarted
     this.localChampionTags = championTags;
     this.process(rawData);
   }
@@ -74,6 +82,9 @@ export class LiveMatchTracker extends EventEmitter {
 
     if (!this.isTracking) {
       this.isTracking = true;
+      this.tipsCtx = createTipsContext();
+      this.lastEventIds.clear();
+      console.log(`[LiveMatchTracker] Game detected (t=${Math.round(state.gameTime)}s)`);
       this.emit('gameStarted', state);
     }
 

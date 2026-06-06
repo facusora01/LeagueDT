@@ -376,12 +376,9 @@ app.whenReady().then(async () => {
   // Start draft detector (wires LCU events → draftSession)
   new LcuDraftDetector(lcuConnector, draftSession);
 
-  // Auto-start in-game tracker when draft finishes (game is loading)
-  draftSession.on('stateChanged', (s: any) => {
-    if (s.phase === 'finished') {
-      liveTracker.start();
-    }
-  });
+  // The in-game tracker polls the Live Client API continuously and detects
+  // a game on its own (independent of draft detection).
+  liveTracker.start();
 
   lcuConnector.on('connect', () => {
     mainWindow?.webContents.send('lcu-status', 'connected');
