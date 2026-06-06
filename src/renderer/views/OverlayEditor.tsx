@@ -6,32 +6,67 @@ import {
   defaultLayout,
   getOverlayOpacity,
   PANEL_IDS,
-  PANEL_TITLES,
   type OverlayLayout,
   type PanelId,
   type PanelBox,
 } from '../lib/overlayPrefs';
+import {
+  TimerContent,
+  ThreatsContent,
+  ItemsContent,
+  TipsContent,
+} from '../components/overlayPanels';
 
-const MIN_W = 140;
-const MIN_H = 56;
+const MIN_W = 100;
+const MIN_H = 44;
 
-type Interaction = {
-  mode: 'drag' | 'resize';
-  id: PanelId;
-  startX: number;
-  startY: number;
-  orig: PanelBox;
-};
+interface Edges { l?: boolean; r?: boolean; t?: boolean; b?: boolean; }
+type Interaction =
+  | { kind: 'drag'; id: PanelId; startX: number; startY: number; orig: PanelBox }
+  | { kind: 'resize'; id: PanelId; edges: Edges; startX: number; startY: number; orig: PanelBox };
 
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
-// Sample content shown inside each panel while editing.
-const SAMPLE: Record<PanelId, React.ReactNode> = {
-  timer: <span className="text-secondary font-mono font-bold">12:34 · 6/1/2</span>,
-  threats: <span className="text-text-muted">Zed HIGH · Caitlyn MED · …</span>,
-  items: <span className="text-text-muted">Kraken · IE · Botas · …</span>,
-  tips: <span className="text-text-muted">Dragón en 40s — agrupá</span>,
+// Resize handles: 4 edges + 4 corners.
+const HANDLES: { edges: Edges; cls: string }[] = [
+  { edges: { t: true }, cls: 'top-0 left-2 right-2 h-1.5 cursor-ns-resize' },
+  { edges: { b: true }, cls: 'bottom-0 left-2 right-2 h-1.5 cursor-ns-resize' },
+  { edges: { l: true }, cls: 'left-0 top-2 bottom-2 w-1.5 cursor-ew-resize' },
+  { edges: { r: true }, cls: 'right-0 top-2 bottom-2 w-1.5 cursor-ew-resize' },
+  { edges: { t: true, l: true }, cls: 'top-0 left-0 w-2.5 h-2.5 cursor-nwse-resize bg-primary/70' },
+  { edges: { t: true, r: true }, cls: 'top-0 right-0 w-2.5 h-2.5 cursor-nesw-resize bg-primary/70' },
+  { edges: { b: true, l: true }, cls: 'bottom-0 left-0 w-2.5 h-2.5 cursor-nesw-resize bg-primary/70' },
+  { edges: { b: true, r: true }, cls: 'bottom-0 right-0 w-2.5 h-2.5 cursor-nwse-resize bg-primary/70' },
+];
+
+// Sample data so the panels render real (adaptive) content while editing.
+const SAMPLE = {
+  timer: { gameTime: 754, championName: 'Pyke', kills: 6, deaths: 1, assists: 2, cs: 20 },
+  threats: [
+    { summonerName: 'a', championName: 'Zed', threatLevel: 'high' },
+    { summonerName: 'b', championName: 'Caitlyn', threatLevel: 'medium' },
+    { summonerName: 'c', championName: 'Lulu', threatLevel: 'low' },
+  ],
+  items: [
+    { itemId: 6691, name: "Prowler's Claw" },
+    { itemId: 3031, name: 'Infinity Edge' },
+    { itemId: 3006, name: "Berserker's Greaves" },
+    { itemId: 3036, name: "Lord Dominik's Regards" },
+  ],
+  tips: [
+    { id: '1', message: 'Dragón aparece en ~40s — agrupá al equipo', priority: 'high' },
+    { id: '2', message: 'CS bajo — enfocate en farmear', priority: 'medium' },
+  ],
 };
+
+function panelContent(id: PanelId, box: PanelBox) {
+  switch (id) {
+    case 'timer': return <TimerContent box={box} data={SAMPLE.timer} />;
+    case 'threats': return <ThreatsContent box={box} threats={SAMPLE.threats} />;
+    case 'items': return <ItemsContent box={box} items={SAMPLE.items} />;
+    case 'tips': return <TipsContent box={box} tips={SAMPLE.tips} />;
+  }
+}
 
 export const OverlayEditor: React.FC = () => {
   const [layout, setLayout] = useState<OverlayLayout>(() => getOverlayLayout());
@@ -44,26 +79,26 @@ export const OverlayEditor: React.FC = () => {
       if (!it) return;
       const dx = e.clientX - it.startX;
       const dy = e.clientY - it.startY;
+      const W = window.innerWidth;
+      const H = window.innerHeight;
+
       setLayout(prev => {
-        const b = it.orig;
-        const next: PanelBox =
-          it.mode === 'drag'
-            ? {
-                ...b,
-                x: clamp(b.x + dx, 0, window.innerWidth - b.w),
-                y: clamp(b.y + dy, 0, window.innerHeight - b.h),
-              }
-            : {
-                ...b,
-                w: clamp(b.w + dx, MIN_W, window.innerWidth - b.x),
-                h: clamp(b.h + dy, MIN_H, window.innerHeight - b.y),
-              };
+        const o = it.orig;
+        let next: PanelBox;
+        if (it.kind === 'drag') {
+          next = { ...o, x: clamp(o.x + dx, 0, W - o.w), y: clamp(o.y + dy, 0, H - o.h) };
+        } else {
+          let { x, y, w, h } = o;
+          if (it.edges.r) w = clamp(o.w + dx, MIN_W, W - o.x);
+          if (it.edges.l) { const nw = clamp(o.w - dx, MIN_W, o.x + o.w); x = o.x + o.w - nw; w = nw; }
+          if (it.edges.b) h = clamp(o.h + dy, MIN_H, H - o.y);
+          if (it.edges.t) { const nh = clamp(o.h - dy, MIN_H, o.y + o.h); y = o.y + o.h - nh; h = nh; }
+          next = { x, y, w, h };
+        }
         return { ...prev, [it.id]: next };
       });
     }
-    function onUp() {
-      interaction.current = null;
-    }
+    function onUp() { interaction.current = null; }
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
     return () => {
@@ -72,39 +107,26 @@ export const OverlayEditor: React.FC = () => {
     };
   }, []);
 
-  function startDrag(id: PanelId, e: React.MouseEvent) {
-    interaction.current = { mode: 'drag', id, startX: e.clientX, startY: e.clientY, orig: layout[id] };
-  }
-  function startResize(id: PanelId, e: React.MouseEvent) {
+  const startDrag = (id: PanelId, e: React.MouseEvent) => {
+    interaction.current = { kind: 'drag', id, startX: e.clientX, startY: e.clientY, orig: layout[id] };
+  };
+  const startResize = (id: PanelId, edges: Edges, e: React.MouseEvent) => {
     e.stopPropagation();
-    interaction.current = { mode: 'resize', id, startX: e.clientX, startY: e.clientY, orig: layout[id] };
-  }
+    interaction.current = { kind: 'resize', id, edges, startX: e.clientX, startY: e.clientY, orig: layout[id] };
+  };
 
-  function save() {
-    setOverlayLayout(layout);
-    api.setOverlayMode('off');
-  }
-  function cancel() {
-    api.setOverlayMode('off');
-  }
-  function reset() {
-    setLayout(defaultLayout());
-  }
+  const save = () => { setOverlayLayout(layout); api.setOverlayMode('off'); };
+  const cancel = () => api.setOverlayMode('off');
+  const reset = () => setLayout(defaultLayout());
 
   return (
     <div className="w-full h-full relative select-none" style={{ background: 'rgba(0,0,0,0.25)' }}>
       {/* Toolbar above the HUD */}
       <div className="absolute top-3 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-surface border border-border rounded-lg px-3 py-2 shadow-xl">
-        <span className="text-xs text-text-secondary mr-1">Arrastrá y redimensioná los paneles</span>
-        <button onClick={reset} className="px-3 py-1.5 text-xs bg-surface-light text-text-secondary border border-border rounded-md hover:text-text-primary">
-          Restaurar
-        </button>
-        <button onClick={cancel} className="px-3 py-1.5 text-xs bg-destructive/20 text-destructive border border-destructive/30 rounded-md hover:bg-destructive/30">
-          Cancelar
-        </button>
-        <button onClick={save} className="px-3 py-1.5 text-xs bg-primary/20 text-primary border border-primary/40 rounded-md hover:bg-primary/30">
-          Guardar
-        </button>
+        <span className="text-xs text-text-secondary mr-1">Mové (arrastrando) y redimensioná (bordes)</span>
+        <button onClick={reset} className="px-3 py-1.5 text-xs bg-surface-light text-text-secondary border border-border rounded-md hover:text-text-primary">Restaurar</button>
+        <button onClick={cancel} className="px-3 py-1.5 text-xs bg-destructive/20 text-destructive border border-destructive/30 rounded-md hover:bg-destructive/30">Cancelar</button>
+        <button onClick={save} className="px-3 py-1.5 text-xs bg-primary/20 text-primary border border-primary/40 rounded-md hover:bg-primary/30">Guardar</button>
       </div>
 
       {/* Editable panels */}
@@ -114,20 +136,18 @@ export const OverlayEditor: React.FC = () => {
           <div
             key={id}
             onMouseDown={e => startDrag(id, e)}
-            className="absolute bg-background/90 border-2 border-primary/60 rounded-lg shadow-xl cursor-move overflow-hidden"
+            className="absolute bg-background/90 border-2 border-primary/60 rounded-lg shadow-xl cursor-move overflow-hidden p-2 text-text-primary"
             style={{ left: b.x, top: b.y, width: b.w, height: b.h, opacity }}
           >
-            <div className="px-2 py-1 bg-primary/20 text-primary text-[10px] uppercase tracking-wider font-semibold">
-              {PANEL_TITLES[id]}
-            </div>
-            <div className="p-2 text-xs">{SAMPLE[id]}</div>
+            {panelContent(id, b)}
 
-            {/* Resize handle */}
-            <div
-              onMouseDown={e => startResize(id, e)}
-              className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize bg-primary/60 rounded-tl"
-              style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 100%)' }}
-            />
+            {HANDLES.map((hd, i) => (
+              <div
+                key={i}
+                onMouseDown={e => startResize(id, hd.edges, e)}
+                className={`absolute ${hd.cls}`}
+              />
+            ))}
           </div>
         );
       })}
