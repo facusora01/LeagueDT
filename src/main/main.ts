@@ -1,5 +1,6 @@
-import { app, BrowserWindow, ipcMain, globalShortcut, screen, Rectangle } from 'electron';
+import { app, BrowserWindow, ipcMain, screen, Rectangle } from 'electron';
 import * as path from 'path';
+import { HotkeyManager } from './services/overlay/HotkeyManager';
 import { LcuConnector } from './api/lcu/LcuConnector';
 import { DataDragonManager } from './api/datadragon/DataDragonManager';
 import { RiotApiClient, RiotRegion } from './api/riot/RiotApiClient';
@@ -18,6 +19,7 @@ let isOverlay = false;
 let normalBounds: Rectangle | null = null;
 const DEFAULT_HOTKEY = 'CommandOrControl+Shift+O';
 let overlayHotkey = DEFAULT_HOTKEY;
+const hotkeyManager = new HotkeyManager(() => setOverlay(!isOverlay));
 const lcuConnector = new LcuConnector();
 const riotClient = new RiotApiClient();
 const draftSession = new DraftSession();
@@ -397,22 +399,12 @@ function setOverlay(on: boolean) {
 // Registers the overlay toggle accelerator, reverting to the previous one
 // if the new accelerator is invalid or already taken by another app.
 function registerOverlayShortcut(accel: string): boolean {
-  globalShortcut.unregister(overlayHotkey);
-  let ok = false;
-  try {
-    ok = globalShortcut.register(accel, () => setOverlay(!isOverlay));
-  } catch (err) {
-    console.error('[Overlay] register threw for', accel, err);
-    ok = false;
-  }
-  if (ok) {
+  if (hotkeyManager.setAccelerator(accel)) {
     overlayHotkey = accel;
-    console.log('[Overlay] hotkey registered:', accel);
+    console.log('[Overlay] hotkey set:', accel);
     return true;
   }
-  // Revert to the previous binding.
-  globalShortcut.register(overlayHotkey, () => setOverlay(!isOverlay));
-  console.warn('[Overlay] failed to register', accel, '— kept', overlayHotkey);
+  console.warn('[Overlay] invalid accelerator', accel, '— kept', overlayHotkey);
   return false;
 }
 
@@ -439,6 +431,7 @@ app.whenReady().then(async () => {
     riotClient.setApiKey((settings as any).apiKey);
   }
   registerOverlayShortcut((settings as any).overlayHotkey || DEFAULT_HOTKEY);
+  hotkeyManager.start();
 
   // Start draft detector (wires LCU events → draftSession)
   new LcuDraftDetector(lcuConnector, draftSession);
@@ -466,7 +459,7 @@ app.whenReady().then(async () => {
 });
 
 app.on('will-quit', () => {
-  globalShortcut.unregisterAll();
+  hotkeyManager.stop();
 });
 
 app.on('window-all-closed', () => {
