@@ -1,34 +1,41 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 
+// Resolves a physical key code to an Electron accelerator token.
+function codeToAccel(code: string): string | null {
+  let m: RegExpMatchArray | null;
+  if ((m = code.match(/^Key([A-Z])$/))) return m[1];
+  if ((m = code.match(/^Digit(\d)$/))) return m[1];
+  if ((m = code.match(/^Numpad(\d)$/))) return `num${m[1]}`;
+  if ((m = code.match(/^F(\d{1,2})$/))) return `F${m[1]}`;
+  const named: Record<string, string> = {
+    Space: 'Space', Enter: 'Enter', NumpadEnter: 'Enter', Tab: 'Tab',
+    Backspace: 'Backspace', Delete: 'Delete', Insert: 'Insert',
+    Home: 'Home', End: 'End', PageUp: 'PageUp', PageDown: 'PageDown', Escape: 'Escape',
+    ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right',
+    Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']', Backslash: '\\',
+    Semicolon: ';', Quote: "'", Backquote: '`', Comma: ',', Period: '.', Slash: '/',
+    NumpadAdd: 'numadd', NumpadSubtract: 'numsub', NumpadMultiply: 'nummult',
+    NumpadDivide: 'numdiv', NumpadDecimal: 'numdec',
+  };
+  return named[code] ?? null;
+}
+
 // Maps a browser KeyboardEvent to an Electron accelerator string.
 // Uses e.code (physical key) so modifiers/layouts don't mangle the result
 // (e.g. Alt+O yields a dead char in e.key but "KeyO" in e.code).
+// Single keys (no modifier) are allowed.
 function toAccelerator(e: React.KeyboardEvent): string | null {
   const code = e.code;
   if (/^(Control|Shift|Alt|Meta|OS)(Left|Right)?$/.test(code)) return null;
+
+  const main = codeToAccel(code);
+  if (!main) return null;
 
   const parts: string[] = [];
   if (e.ctrlKey || e.metaKey) parts.push('CommandOrControl');
   if (e.altKey) parts.push('Alt');
   if (e.shiftKey) parts.push('Shift');
-  if (parts.length === 0) return null; // require at least one modifier
-
-  let main: string | null = null;
-  let m: RegExpMatchArray | null;
-  if ((m = code.match(/^Key([A-Z])$/))) main = m[1];
-  else if ((m = code.match(/^Digit(\d)$/))) main = m[1];
-  else if ((m = code.match(/^F(\d{1,2})$/))) main = `F${m[1]}`;
-  else {
-    const named: Record<string, string> = {
-      Space: 'Space', Enter: 'Enter', Tab: 'Tab', Backslash: '\\',
-      ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right',
-      Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']',
-    };
-    main = named[code] ?? null;
-  }
-  if (!main) return null;
-
   parts.push(main);
   return parts.join('+');
 }

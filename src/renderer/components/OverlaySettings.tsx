@@ -22,7 +22,8 @@ export const OverlaySettings: React.FC = () => {
         <label className="block text-xs text-text-secondary mb-1.5">Atajo</label>
         <HotkeyCapture />
         <p className="text-xs text-text-muted mt-1.5">
-          Tocá el botón y presioná la combinación (al menos un modificador: Ctrl o Alt).
+          Tocá el botón y presioná la tecla o combinación (ej. F8, Ctrl+/, Alt+O).
+          Ojo: una tecla sola se reserva en todo el sistema.
         </p>
       </div>
 
