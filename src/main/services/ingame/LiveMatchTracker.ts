@@ -116,6 +116,19 @@ export class LiveMatchTracker extends EventEmitter {
     const resolved = this.resolveTags(state.localPlayer.championName);
     const championTags = resolved.length ? resolved : this.localChampionTags;
 
+    // Only enemies that are an actual threat (medium+) should pull defensive
+    // and anti-heal items — no anti-heal for a 0/10 healer.
+    let threatenedByAD = false;
+    let threatenedByAP = false;
+    let healingThreat = false;
+    for (const th of threats) {
+      if (th.threatLevel === 'low') continue;
+      const tags = this.resolveTags(th.championName);
+      if (tags.some(x => AD_TAGS.includes(x))) threatenedByAD = true;
+      if (tags.includes('Mage')) threatenedByAP = true;
+      if (HEALING_CHAMPIONS.has(th.championName)) healingThreat = true;
+    }
+
     const goldAdv = this.estimateGoldAdvantage(state);
     const itemInput: ItemInput = {
       championTags,
@@ -126,6 +139,9 @@ export class LiveMatchTracker extends EventEmitter {
       enemyADCount: this.countTaggedEnemies(state.enemies, AD_TAGS),
       enemyAPCount: this.countTaggedEnemies(state.enemies, ['Mage']),
       enemyHasHealing: state.enemies.some(e => HEALING_CHAMPIONS.has(e.championName)),
+      threatenedByAD,
+      threatenedByAP,
+      healingThreat,
     };
     this.emit('itemsUpdated', recommendItems(itemInput));
 

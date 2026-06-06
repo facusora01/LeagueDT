@@ -91,6 +91,41 @@ describe('recommendItems', () => {
     expect(hasADCItem).toBe(true);
   });
 
+  test('healingThreat=false suppresses anti-heal even if enemy has healing', () => {
+    // A healer exists but is not a threat (e.g. 0/10) → no anti-heal.
+    const result = recommendItems(baseInput({ enemyHasHealing: true, healingThreat: false }));
+    const hasAntiHeal = result.items.some(i => i.itemId === 3165 || i.itemId === 3033);
+    expect(hasAntiHeal).toBe(false);
+    expect(result.buildStyle).not.toBe('anti-heal');
+  });
+
+  test('healingThreat=true triggers anti-heal', () => {
+    const result = recommendItems(baseInput({ championTags: ['Mage'], healingThreat: true }));
+    expect(result.items.some(i => i.itemId === 3165)).toBe(true);
+  });
+
+  test('threatenedByAP routes to MR defensive items', () => {
+    const result = recommendItems(baseInput({
+      goldAdvantage: -2000,
+      threatenedByAP: true,
+      threatenedByAD: false,
+    }));
+    const hasMR = result.items.some(i => [3065, 3111].includes(i.itemId)); // Spirit Visage / Merc Treads
+    expect(hasMR).toBe(true);
+    const hasArmor = result.items.some(i => [3075, 3047].includes(i.itemId));
+    expect(hasArmor).toBe(false);
+  });
+
+  test('threatenedByAD routes to armor defensive items', () => {
+    const result = recommendItems(baseInput({
+      goldAdvantage: -2000,
+      threatenedByAD: true,
+      threatenedByAP: false,
+    }));
+    const hasArmor = result.items.some(i => [3075, 3047].includes(i.itemId)); // Thornmail / Steelcaps
+    expect(hasArmor).toBe(true);
+  });
+
   test('defensive items suggested when heavily behind', () => {
     const result = recommendItems(baseInput({
       championTags: ['Mage'],

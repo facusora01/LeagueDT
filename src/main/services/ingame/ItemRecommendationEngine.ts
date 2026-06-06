@@ -9,6 +9,11 @@ export interface ItemInput {
   enemyADCount: number;
   enemyAPCount: number;
   enemyHasHealing: boolean;
+  // Threat-aware signals: only the *actual* threats (fed/relevant enemies)
+  // should pull defensive/anti-heal items. When omitted, fall back to comp.
+  threatenedByAD?: boolean;       // a threatening enemy deals physical
+  threatenedByAP?: boolean;       // a threatening enemy deals magic
+  healingThreat?: boolean;        // a threatening enemy has real sustain
 }
 
 // ─── Item catalogue (patch-pinned, update when items change) ─────────────────
@@ -66,7 +71,12 @@ const TRINKET_IDS = new Set([3340, 3363, 3364, 3330, 3865, 2055, 2052]);
 
 export function recommendItems(input: ItemInput): ItemBuildRecommendation {
   const phase = getPhase(input.gameTime);
-  const buildStyle = getBuildStyle(input.goldAdvantage, input.enemyHasHealing);
+  // Anti-heal only when a real threat sustains (fed healer), not any healer.
+  const antiHeal = input.healingThreat ?? input.enemyHasHealing;
+  // Which damage type the actual threats deal — fall back to raw comp counts.
+  const facingAP = input.threatenedByAP ?? (input.enemyAPCount > input.enemyADCount);
+  const facingAD = input.threatenedByAD ?? (input.enemyADCount >= input.enemyAPCount);
+  const buildStyle = getBuildStyle(input.goldAdvantage, antiHeal);
   const champType = getChampType(input.championTags);
 
   // If all 6 item slots are filled, nothing new can be bought.
@@ -90,23 +100,27 @@ export function recommendItems(input: ItemInput): ItemBuildRecommendation {
     selected.push(toSuggestion(pick));
   }
 
-  // ── 2. Anti-heal if applicable ────────────────────────────────────────────
-  if (input.enemyHasHealing) {
+  // ── 2. Anti-heal — only against a real sustain threat ────────────────────
+  if (antiHeal) {
     const antiHealTag = champType === 'ap' ? 'morellonomicon' : 'mortalReminder';
-    const antiHeal = ITEMS[antiHealTag];
-    if (antiHeal && !input.ownedItemIds.includes(antiHeal.itemId)) {
-      selected.push(toSuggestion(antiHeal));
+    const item = ITEMS[antiHealTag];
+    if (item && !input.ownedItemIds.includes(item.itemId)) {
+      selected.push(toSuggestion(item));
     }
   }
 
-  // ── 3. Armor/MR if behind or enemy heavy ─────────────────────────────────
+  // ── 3. Armor/MR vs the actual threat's damage type ───────────────────────
   if (buildStyle === 'defensive' || input.goldAdvantage < -1500) {
-    if (input.enemyADCount >= input.enemyAPCount) {
+    if (facingAP && !facingAD) {
+      addIfNotOwned(selected, ITEMS['spiritVisage'], input.ownedItemIds);
+      addIfNotOwned(selected, ITEMS['mercTreads'], input.ownedItemIds);
+    } else if (facingAD && !facingAP) {
       addIfNotOwned(selected, ITEMS['thornmail'], input.ownedItemIds);
       addIfNotOwned(selected, ITEMS['steelcaps'], input.ownedItemIds);
     } else {
+      // mixed/unknown — cover the more common type first
+      addIfNotOwned(selected, ITEMS['thornmail'], input.ownedItemIds);
       addIfNotOwned(selected, ITEMS['spiritVisage'], input.ownedItemIds);
-      addIfNotOwned(selected, ITEMS['mercTreads'], input.ownedItemIds);
     }
   }
 
@@ -135,11 +149,11 @@ export function recommendItems(input: ItemInput): ItemBuildRecommendation {
   if (!ownBoots) {
     if (champType === 'ap') addIfNotOwned(selected, ITEMS['sorceresShoes'], input.ownedItemIds);
     else if (champType === 'marksman') addIfNotOwned(selected, ITEMS['berserkGreaves'], input.ownedItemIds);
-    else if (input.enemyAPCount > input.enemyADCount) addIfNotOwned(selected, ITEMS['mercTreads'], input.ownedItemIds);
+    else if (facingAP && !facingAD) addIfNotOwned(selected, ITEMS['mercTreads'], input.ownedItemIds);
     else addIfNotOwned(selected, ITEMS['steelcaps'], input.ownedItemIds);
   }
 
-  const reasoning = buildReasoning(buildStyle, phase, input.enemyHasHealing, input.goldAdvantage);
+  const reasoning = buildReasoning(buildStyle, phase, antiHeal, input.goldAdvantage);
 
   return {
     phase,
