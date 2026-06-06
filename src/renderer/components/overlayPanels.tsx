@@ -116,9 +116,48 @@ export interface ItemLike {
   name: string;
 }
 
-export const ItemsContent: React.FC<{ box: PanelBox; items: ItemLike[] }> = ({ box, items }) => {
+export interface SwapLike {
+  outItemId: number;
+  in: ItemLike;
+}
+
+export const ItemsContent: React.FC<{ box: PanelBox; items: ItemLike[]; swaps?: SwapLike[] }> = ({
+  box,
+  items,
+  swaps = [],
+}) => {
   const iconsOnly = box.w < 165;        // below this: just the item icons
   const showHeader = box.h >= 64;
+
+  // Build full → show swap suggestions ([owned] 🪙→ [suggested]).
+  if (items.length === 0 && swaps.length > 0) {
+    const rows = maxRows(box, showHeader);
+    return (
+      <>
+        {showHeader && <Header>Cambios</Header>}
+        <div className="space-y-1">
+          {swaps.slice(0, rows).map((s, i) => (
+            <div key={i} className="flex items-center gap-1">
+              <img
+                src={itemIcon(s.outItemId)}
+                alt=""
+                className="w-6 h-6 rounded border border-destructive/40 opacity-70 shrink-0"
+                onError={imgErr}
+              />
+              <span className="text-secondary text-xs shrink-0" title="Vender y comprar">🪙→</span>
+              <img
+                src={itemIcon(s.in.itemId)}
+                alt=""
+                className="w-6 h-6 rounded border border-success/50 shrink-0"
+                onError={imgErr}
+              />
+              {!iconsOnly && <span className="text-xs truncate">{s.in.name}</span>}
+            </div>
+          ))}
+        </div>
+      </>
+    );
+  }
 
   if (iconsOnly) {
     return (

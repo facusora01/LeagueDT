@@ -61,10 +61,16 @@ export interface ItemSuggestion {
   reason: string;
 }
 
+export interface ItemSwap {
+  outItemId: number;          // currently owned item to replace
+  in: ItemSuggestion;         // suggested replacement
+}
+
 export interface ItemBuildRecommendation {
   phase: GamePhase;
   buildStyle: 'aggressive' | 'defensive' | 'balanced' | 'anti-heal';
-  items: ItemSuggestion[];
+  items: ItemSuggestion[];    // items to buy (free slots available)
+  swaps: ItemSwap[];          // replacements when the build is full
   reasoning: string;
 }
 

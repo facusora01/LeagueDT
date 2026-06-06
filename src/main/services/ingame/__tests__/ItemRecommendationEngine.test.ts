@@ -91,6 +91,29 @@ describe('recommendItems', () => {
     expect(hasADCItem).toBe(true);
   });
 
+  test('full build suggests swaps instead of nothing', () => {
+    const result = recommendItems(baseInput({
+      championTags: ['Marksman'],
+      ownedItemIds: [3031, 6672, 3036, 3072, 3046, 3006], // 6 filled slots
+      goldAdvantage: -2000,
+      threatenedByAD: true,
+      threatenedByAP: false,
+    }));
+    expect(result.items).toHaveLength(0);
+    expect(result.swaps.length).toBeGreaterThan(0);
+    // each swap replaces an owned item with a desired one
+    for (const s of result.swaps) {
+      expect(result.swaps.every(x => x.in.itemId !== s.outItemId)).toBe(true);
+      expect(s.in.itemId).toBeGreaterThan(0);
+    }
+  });
+
+  test('non-full build has no swaps', () => {
+    const result = recommendItems(baseInput({ ownedItemIds: [3020] }));
+    expect(result.swaps).toHaveLength(0);
+    expect(result.items.length).toBeGreaterThan(0);
+  });
+
   test('healingThreat=false suppresses anti-heal even if enemy has healing', () => {
     // A healer exists but is not a threat (e.g. 0/10) → no anti-heal.
     const result = recommendItems(baseInput({ enemyHasHealing: true, healingThreat: false }));

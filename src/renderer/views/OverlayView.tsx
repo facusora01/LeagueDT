@@ -48,9 +48,9 @@ export const OverlayView: React.FC = () => {
         </div>
       )}
 
-      {build && build.items.length > 0 && (
+      {build && (build.items.length > 0 || build.swaps.length > 0) && (
         <div className={panel} style={boxStyle(layout.items)}>
-          <ItemsContent box={layout.items} items={build.items} />
+          <ItemsContent box={layout.items} items={build.items} swaps={build.swaps} />
         </div>
       )}
 

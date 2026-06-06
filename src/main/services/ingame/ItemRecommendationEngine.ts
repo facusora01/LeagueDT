@@ -1,4 +1,6 @@
-import type { GamePhase, ItemBuildRecommendation, ItemSuggestion } from './types';
+import type { GamePhase, ItemBuildRecommendation, ItemSuggestion, ItemSwap } from './types';
+
+type BuildStyle = ItemBuildRecommendation['buildStyle'];
 
 export interface ItemInput {
   championTags: string[];         // ['Mage'] | ['Fighter', 'Tank'] etc.
@@ -79,37 +81,58 @@ export function recommendItems(input: ItemInput): ItemBuildRecommendation {
   const buildStyle = getBuildStyle(input.goldAdvantage, antiHeal);
   const champType = getChampType(input.championTags);
 
-  // If all 6 item slots are filled, nothing new can be bought.
+  // The items we'd ideally want next (excludes ones already owned).
+  const desired = selectItems(input, phase, buildStyle, champType, antiHeal, facingAP, facingAD);
+
+  // When all 6 slots are full we can't buy more — suggest swaps instead so the
+  // coach keeps adapting to the game (e.g. buy armor when their carry is fed).
   const filledSlots = input.ownedItemIds.filter(id => id && !TRINKET_IDS.has(id)).length;
   if (filledSlots >= 6) {
+    const swaps = computeSwaps(input, desired);
     return {
       phase,
       buildStyle,
       items: [],
-      reasoning: 'Build completa — no hay slots libres para nuevos items.',
+      swaps,
+      reasoning: swaps.length
+        ? 'Build completa — cambios sugeridos según cómo va la partida.'
+        : 'Build completa y acorde a la partida.',
     };
   }
 
+  return {
+    phase,
+    buildStyle,
+    items: desired.slice(0, 6),
+    swaps: [],
+    reasoning: buildReasoning(buildStyle, phase, antiHeal, input.goldAdvantage),
+  };
+}
+
+// Ordered list of items worth buying next, given game state (skips owned ones).
+function selectItems(
+  input: ItemInput,
+  phase: GamePhase,
+  buildStyle: BuildStyle,
+  champType: ReturnType<typeof getChampType>,
+  antiHeal: boolean,
+  facingAP: boolean,
+  facingAD: boolean,
+): ItemSuggestion[] {
   const selected: ItemSuggestion[] = [];
 
-  // ── 1. Core mythic (if not owned) ────────────────────────────────────────
+  // 1. Core mythic
   const mythics = ALL_ITEMS.filter(i => i.tags.includes('mythic') && i.tags.includes(champType));
-  const ownsMythic = mythics.some(m => input.ownedItemIds.includes(m.itemId));
-  if (!ownsMythic && mythics.length > 0) {
-    const pick = phase === 'early' ? mythics[0] : mythics[Math.min(1, mythics.length - 1)];
-    selected.push(toSuggestion(pick));
+  if (!mythics.some(m => input.ownedItemIds.includes(m.itemId)) && mythics.length > 0) {
+    selected.push(toSuggestion(phase === 'early' ? mythics[0] : mythics[Math.min(1, mythics.length - 1)]));
   }
 
-  // ── 2. Anti-heal — only against a real sustain threat ────────────────────
+  // 2. Anti-heal — only against a real sustain threat
   if (antiHeal) {
-    const antiHealTag = champType === 'ap' ? 'morellonomicon' : 'mortalReminder';
-    const item = ITEMS[antiHealTag];
-    if (item && !input.ownedItemIds.includes(item.itemId)) {
-      selected.push(toSuggestion(item));
-    }
+    addIfNotOwned(selected, ITEMS[champType === 'ap' ? 'morellonomicon' : 'mortalReminder'], input.ownedItemIds);
   }
 
-  // ── 3. Armor/MR vs the actual threat's damage type ───────────────────────
+  // 3. Armor/MR vs the actual threat's damage type
   if (buildStyle === 'defensive' || input.goldAdvantage < -1500) {
     if (facingAP && !facingAD) {
       addIfNotOwned(selected, ITEMS['spiritVisage'], input.ownedItemIds);
@@ -118,13 +141,12 @@ export function recommendItems(input: ItemInput): ItemBuildRecommendation {
       addIfNotOwned(selected, ITEMS['thornmail'], input.ownedItemIds);
       addIfNotOwned(selected, ITEMS['steelcaps'], input.ownedItemIds);
     } else {
-      // mixed/unknown — cover the more common type first
       addIfNotOwned(selected, ITEMS['thornmail'], input.ownedItemIds);
       addIfNotOwned(selected, ITEMS['spiritVisage'], input.ownedItemIds);
     }
   }
 
-  // ── 4. Damage amplifiers if ahead ────────────────────────────────────────
+  // 4. Damage amplifiers if ahead
   if (buildStyle === 'aggressive') {
     if (champType === 'ap') {
       addIfNotOwned(selected, ITEMS['rabadon'], input.ownedItemIds);
@@ -135,32 +157,37 @@ export function recommendItems(input: ItemInput): ItemBuildRecommendation {
     }
   }
 
-  // ── 5. Penetration items in mid/late vs tanky enemies ────────────────────
+  // 5. Penetration in mid/late
   if (phase !== 'early') {
-    if (champType === 'ap') {
-      addIfNotOwned(selected, ITEMS['voidStaff'], input.ownedItemIds);
-    } else {
-      addIfNotOwned(selected, ITEMS['blackCleaver'], input.ownedItemIds);
-    }
+    addIfNotOwned(selected, ITEMS[champType === 'ap' ? 'voidStaff' : 'blackCleaver'], input.ownedItemIds);
   }
 
-  // ── 6. Boots if not owned ────────────────────────────────────────────────
-  const ownBoots = input.ownedItemIds.some(id => BOOTS_IDS.has(id));
-  if (!ownBoots) {
+  // 6. Boots
+  if (!input.ownedItemIds.some(id => BOOTS_IDS.has(id))) {
     if (champType === 'ap') addIfNotOwned(selected, ITEMS['sorceresShoes'], input.ownedItemIds);
     else if (champType === 'marksman') addIfNotOwned(selected, ITEMS['berserkGreaves'], input.ownedItemIds);
     else if (facingAP && !facingAD) addIfNotOwned(selected, ITEMS['mercTreads'], input.ownedItemIds);
     else addIfNotOwned(selected, ITEMS['steelcaps'], input.ownedItemIds);
   }
 
-  const reasoning = buildReasoning(buildStyle, phase, antiHeal, input.goldAdvantage);
+  return selected;
+}
 
-  return {
-    phase,
-    buildStyle,
-    items: selected.slice(0, 6),
-    reasoning,
-  };
+// Pairs each desired item with an owned item worth replacing (not boots, not a
+// trinket, and not itself something we'd want to keep).
+function computeSwaps(input: ItemInput, desired: ItemSuggestion[]): ItemSwap[] {
+  const desiredIds = new Set(desired.map(d => d.itemId));
+  const replaceable = input.ownedItemIds.filter(
+    id => id && !TRINKET_IDS.has(id) && !BOOTS_IDS.has(id) && !desiredIds.has(id),
+  );
+
+  const swaps: ItemSwap[] = [];
+  let ri = 0;
+  for (const item of desired) {
+    if (ri >= replaceable.length) break;
+    swaps.push({ outItemId: replaceable[ri++], in: item });
+  }
+  return swaps.slice(0, 3);
 }
 
 function getPhase(gameTime: number): GamePhase {

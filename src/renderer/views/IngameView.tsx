@@ -121,7 +121,7 @@ export const IngameView: React.FC = () => {
           <SectionTitle right={build ? <span className="text-xs text-text-muted">{build.buildStyle}</span> : undefined}>
             Items Recomendados
           </SectionTitle>
-          {!build || build.items.length === 0 ? (
+          {!build || (build.items.length === 0 && build.swaps.length === 0) ? (
             <EmptyState title="Sin sugerencias aún" />
           ) : (
             <>
@@ -137,6 +137,29 @@ export const IngameView: React.FC = () => {
                     <div className="flex-1 min-w-0">
                       <span className="text-sm text-text-primary">{item.name}</span>
                       <p className="text-[11px] text-text-muted truncate">{item.reason}</p>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Swap suggestions when the build is full */}
+                {build.swaps.map((s, i) => (
+                  <div key={`swap-${i}`} className="flex items-center gap-2 p-1.5 rounded-md hover:bg-surface-light">
+                    <img
+                      src={itemIcon(s.outItemId)}
+                      alt=""
+                      className="w-9 h-9 rounded border border-destructive/40 opacity-70 shrink-0"
+                      onError={e => { (e.target as HTMLImageElement).style.visibility = 'hidden'; }}
+                    />
+                    <span className="text-secondary text-sm shrink-0" title="Vender y comprar">🪙→</span>
+                    <img
+                      src={itemIcon(s.in.itemId)}
+                      alt=""
+                      className="w-9 h-9 rounded border border-success/50 shrink-0"
+                      onError={e => { (e.target as HTMLImageElement).style.visibility = 'hidden'; }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm text-text-primary">{s.in.name}</span>
+                      <p className="text-[11px] text-text-muted truncate">{s.in.reason}</p>
                     </div>
                   </div>
                 ))}

@@ -144,10 +144,16 @@ export interface ItemSuggestionDTO {
   reason: string;
 }
 
+export interface ItemSwapDTO {
+  outItemId: number;
+  in: ItemSuggestionDTO;
+}
+
 export interface ItemBuildDTO {
   phase: 'early' | 'mid' | 'late';
   buildStyle: 'aggressive' | 'defensive' | 'balanced' | 'anti-heal';
   items: ItemSuggestionDTO[];
+  swaps: ItemSwapDTO[];
   reasoning: string;
 }
 
