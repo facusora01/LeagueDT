@@ -14,12 +14,18 @@ import { LcuDraftDetector } from './services/draft/LcuDraftDetector';
 import { LiveMatchTracker } from './services/ingame/LiveMatchTracker';
 import { mockChampSelectSession, mockBanPhaseSession, mockLiveGameData } from './services/dev/mockData';
 
+type OverlayMode = 'off' | 'live' | 'edit';
+
 let mainWindow: BrowserWindow | null = null;
-let isOverlay = false;
+let overlayMode: OverlayMode = 'off';
 let normalBounds: Rectangle | null = null;
 const DEFAULT_HOTKEY = 'CommandOrControl+Shift+O';
 let overlayHotkey = DEFAULT_HOTKEY;
-const hotkeyManager = new HotkeyManager(() => setOverlay(!isOverlay));
+const hotkeyManager = new HotkeyManager(() => {
+  // The hotkey only toggles the live overlay; it never disturbs edit mode.
+  if (overlayMode === 'edit') return;
+  setOverlayMode(overlayMode === 'live' ? 'off' : 'live');
+});
 const lcuConnector = new LcuConnector();
 const riotClient = new RiotApiClient();
 const draftSession = new DraftSession();
@@ -274,8 +280,15 @@ function registerIpcHandlers() {
   });
 
   // ── Overlay ───────────────────────────────────────────────────────────────
-  ipcMain.handle('overlay:toggle', () => { setOverlay(!isOverlay); return { overlay: isOverlay }; });
-  ipcMain.handle('overlay:get', () => ({ overlay: isOverlay }));
+  ipcMain.handle('overlay:toggle', () => {
+    if (overlayMode !== 'edit') setOverlayMode(overlayMode === 'live' ? 'off' : 'live');
+    return { mode: overlayMode };
+  });
+  ipcMain.handle('overlay:set-mode', (_e, mode: OverlayMode) => {
+    setOverlayMode(mode);
+    return { mode: overlayMode };
+  });
+  ipcMain.handle('overlay:get', () => ({ mode: overlayMode }));
   ipcMain.handle('overlay:get-hotkey', () => ({ hotkey: overlayHotkey }));
   ipcMain.handle('overlay:set-hotkey', async (_e, accel: string) => {
     const ok = registerOverlayShortcut(accel);
@@ -373,27 +386,32 @@ async function loadCurrentSummonerFromLcu() {
   }
 }
 
-// Toggles the window between normal and a full-screen, click-through,
-// always-on-top overlay that sits over the game.
-function setOverlay(on: boolean) {
-  if (!mainWindow || on === isOverlay) return;
-  isOverlay = on;
+// Switches the window between normal, a click-through live overlay, and an
+// interactive edit overlay (same full-screen frame, but mouse-enabled so the
+// user can drag/resize panels).
+function setOverlayMode(mode: OverlayMode) {
+  if (!mainWindow || mode === overlayMode) return;
+  const wasOff = overlayMode === 'off';
+  overlayMode = mode;
 
-  if (on) {
-    normalBounds = mainWindow.getBounds();
-    const display = screen.getPrimaryDisplay();
-    mainWindow.setBounds(display.bounds);
-    mainWindow.setAlwaysOnTop(true, 'screen-saver');
-    mainWindow.setIgnoreMouseEvents(true, { forward: true });
-    mainWindow.setResizable(false);
-  } else {
+  if (mode === 'off') {
     mainWindow.setIgnoreMouseEvents(false);
     mainWindow.setAlwaysOnTop(false);
     mainWindow.setResizable(true);
     if (normalBounds) mainWindow.setBounds(normalBounds);
+  } else {
+    if (wasOff) {
+      normalBounds = mainWindow.getBounds();
+      mainWindow.setBounds(screen.getPrimaryDisplay().bounds);
+    }
+    mainWindow.setAlwaysOnTop(true, 'screen-saver');
+    mainWindow.setResizable(false);
+    // Live overlay is click-through; edit overlay must receive mouse events.
+    if (mode === 'live') mainWindow.setIgnoreMouseEvents(true, { forward: true });
+    else mainWindow.setIgnoreMouseEvents(false);
   }
 
-  mainWindow.webContents.send('overlay:changed', isOverlay);
+  mainWindow.webContents.send('overlay:mode', overlayMode);
 }
 
 // Registers the overlay toggle accelerator, reverting to the previous one

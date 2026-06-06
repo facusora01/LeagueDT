@@ -7,6 +7,9 @@ import { SummonerView } from './views/SummonerView';
 import { DraftView } from './views/DraftView';
 import { IngameView } from './views/IngameView';
 import { OverlayView } from './views/OverlayView';
+import { OverlayEditor } from './views/OverlayEditor';
+
+type OverlayMode = 'off' | 'live' | 'edit';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewId>('summoner');
@@ -14,7 +17,7 @@ const App: React.FC = () => {
   const [ddVersion, setDdVersion] = useState<string | null>(null);
   const [draftActive, setDraftActive] = useState(false);
   const [gameActive, setGameActive] = useState(false);
-  const [overlay, setOverlay] = useState(false);
+  const [overlayMode, setOverlayMode] = useState<OverlayMode>('off');
 
   useEffect(() => {
     if (!hasApi) return;
@@ -40,15 +43,15 @@ const App: React.FC = () => {
     api.onGameStarted(() => { setGameActive(true); setView('ingame'); });
     api.onGameEnded(() => setGameActive(false));
 
-    // Overlay mode toggled via global hotkey (Ctrl+Shift+O)
-    api.getOverlay().then(s => setOverlay(s.overlay));
-    api.onOverlayChanged(setOverlay);
+    // Overlay mode (live via hotkey, edit via settings)
+    api.getOverlayMode().then(s => setOverlayMode(s.mode));
+    api.onOverlayMode(setOverlayMode);
   }, []);
 
-  // Make the page background transparent while in overlay mode.
+  // Make the page background transparent while any overlay mode is active.
   useEffect(() => {
-    document.body.style.background = overlay ? 'transparent' : '';
-  }, [overlay]);
+    document.body.style.background = overlayMode !== 'off' ? 'transparent' : '';
+  }, [overlayMode]);
 
   if (!hasApi) {
     return (
@@ -58,9 +61,8 @@ const App: React.FC = () => {
     );
   }
 
-  if (overlay) {
-    return <OverlayView />;
-  }
+  if (overlayMode === 'live') return <OverlayView />;
+  if (overlayMode === 'edit') return <OverlayEditor />;
 
   return (
     <div className="flex flex-col h-full bg-background text-text-primary">

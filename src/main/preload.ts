@@ -48,9 +48,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // ── Overlay ───────────────────────────────────────────────────────────────
   toggleOverlay: () => ipcRenderer.invoke('overlay:toggle'),
-  getOverlay: () => ipcRenderer.invoke('overlay:get'),
-  onOverlayChanged: (cb: (on: boolean) => void) =>
-    ipcRenderer.on('overlay:changed', (_e, on) => cb(on)),
+  setOverlayMode: (mode: 'off' | 'live' | 'edit') => ipcRenderer.invoke('overlay:set-mode', mode),
+  getOverlayMode: () => ipcRenderer.invoke('overlay:get'),
+  onOverlayMode: (cb: (mode: 'off' | 'live' | 'edit') => void) =>
+    ipcRenderer.on('overlay:mode', (_e, mode) => cb(mode)),
   getOverlayHotkey: () => ipcRenderer.invoke('overlay:get-hotkey'),
   setOverlayHotkey: (accel: string) => ipcRenderer.invoke('overlay:set-hotkey', accel),
 

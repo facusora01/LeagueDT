@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { HotkeyCapture } from './HotkeyCapture';
+import { api } from '../lib/api';
 import {
   getOverlayOpacity,
   setOverlayOpacity,
@@ -61,6 +62,19 @@ export const OverlaySettings: React.FC = () => {
 
         <p className="text-xs text-text-muted mt-1.5">
           Más bajo = más transparente (ves más del juego). Se aplica al abrir el overlay.
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-xs text-text-secondary mb-1.5">Posición y tamaño</label>
+        <button
+          onClick={() => api.setOverlayMode('edit')}
+          className="px-4 py-2 bg-secondary/20 text-secondary border border-secondary/30 rounded-md text-sm hover:bg-secondary/30 transition-colors"
+        >
+          Configurar overlay
+        </button>
+        <p className="text-xs text-text-muted mt-1.5">
+          Abre el editor a pantalla completa: arrastrá y redimensioná cada panel, después Guardar o Cancelar.
         </p>
       </div>
     </div>

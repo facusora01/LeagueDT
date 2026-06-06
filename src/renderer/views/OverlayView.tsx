@@ -2,20 +2,17 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { championSquareByName, itemIcon } from '../lib/ddragon';
 import { ThreatBadge, TipPriorityBorder, formatGameTime } from '../components/common';
-import { getOverlayOpacity } from '../lib/overlayPrefs';
+import { getOverlayOpacity, getOverlayLayout, type PanelBox } from '../lib/overlayPrefs';
 import type { GameStateDTO, ThreatDTO, ItemBuildDTO, TipDTO } from '../../shared/types';
 
-// Translucent, click-through panels positioned to avoid the in-game HUD:
-//   timer  → top-left (free area)
-//   threats→ upper-right, below the scoreboard / FPS readout
-//   items  → lower-right, above the minimap
-//   tips   → mid-left, above the chat box
+// Translucent, click-through panels placed according to the saved layout.
 export const OverlayView: React.FC = () => {
   const [game, setGame] = useState<GameStateDTO | null>(null);
   const [threats, setThreats] = useState<ThreatDTO[]>([]);
   const [build, setBuild] = useState<ItemBuildDTO | null>(null);
   const [tips, setTips] = useState<TipDTO[]>([]);
   const opacity = getOverlayOpacity();
+  const layout = getOverlayLayout();
 
   useEffect(() => {
     api.onGameStarted(setGame);
@@ -32,13 +29,16 @@ export const OverlayView: React.FC = () => {
     );
   }, []);
 
-  const panel = 'bg-background/90 backdrop-blur-sm border border-border/60 rounded-lg p-2.5 shadow-xl';
+  const boxStyle = (b: PanelBox): React.CSSProperties => ({
+    left: b.x, top: b.y, width: b.w, height: b.h, opacity,
+  });
+  const panel = 'absolute overflow-hidden bg-background/90 backdrop-blur-sm border border-border/60 rounded-lg p-2.5 shadow-xl';
 
   return (
     <div className="w-full h-full relative text-text-primary pointer-events-none select-none">
-      {/* Top-left: timer + KDA */}
+      {/* Timer / KDA */}
       {game && (
-        <div className={`absolute top-2 left-2 ${panel} flex items-center gap-3`} style={{ opacity }}>
+        <div className={`${panel} flex items-center gap-3`} style={boxStyle(layout.timer)}>
           <span className="text-lg font-mono font-bold text-secondary">{formatGameTime(game.gameTime)}</span>
           <div className="text-xs">
             <div className="text-text-primary">{game.localPlayer.championName}</div>
@@ -49,9 +49,9 @@ export const OverlayView: React.FC = () => {
         </div>
       )}
 
-      {/* Upper-right: threats (below scoreboard / FPS) */}
+      {/* Threats */}
       {threats.length > 0 && (
-        <div className={`absolute top-[15%] right-2 w-56 ${panel}`} style={{ opacity }}>
+        <div className={panel} style={boxStyle(layout.threats)}>
           <h3 className="text-[10px] uppercase tracking-wider text-secondary mb-1.5">Amenazas</h3>
           <div className="space-y-1">
             {threats.slice(0, 5).map(t => (
@@ -70,9 +70,9 @@ export const OverlayView: React.FC = () => {
         </div>
       )}
 
-      {/* Lower-right: items (above the minimap) */}
+      {/* Items */}
       {build && build.items.length > 0 && (
-        <div className={`absolute bottom-[30%] right-2 w-56 ${panel}`} style={{ opacity }}>
+        <div className={panel} style={boxStyle(layout.items)}>
           <h3 className="text-[10px] uppercase tracking-wider text-secondary mb-1.5">Items</h3>
           <div className="space-y-1">
             {build.items.slice(0, 5).map(item => (
@@ -90,9 +90,9 @@ export const OverlayView: React.FC = () => {
         </div>
       )}
 
-      {/* Mid-left: tips (above the chat box) */}
+      {/* Tips */}
       {tips.length > 0 && (
-        <div className={`absolute bottom-[32%] left-2 w-72 ${panel}`} style={{ opacity }}>
+        <div className={panel} style={boxStyle(layout.tips)}>
           <h3 className="text-[10px] uppercase tracking-wider text-secondary mb-1.5">Tips</h3>
           <div className="space-y-1">
             {tips.map(tip => (

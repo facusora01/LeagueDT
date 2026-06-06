@@ -31,9 +31,10 @@ export interface ElectronAPI {
   simulateGame: () => Promise<{ ok: boolean }>;
   stopSimulation: () => Promise<{ ok: boolean }>;
   // Overlay
-  toggleOverlay: () => Promise<{ overlay: boolean }>;
-  getOverlay: () => Promise<{ overlay: boolean }>;
-  onOverlayChanged: (cb: (on: boolean) => void) => void;
+  toggleOverlay: () => Promise<{ mode: 'off' | 'live' | 'edit' }>;
+  setOverlayMode: (mode: 'off' | 'live' | 'edit') => Promise<{ mode: 'off' | 'live' | 'edit' }>;
+  getOverlayMode: () => Promise<{ mode: 'off' | 'live' | 'edit' }>;
+  onOverlayMode: (cb: (mode: 'off' | 'live' | 'edit') => void) => void;
   getOverlayHotkey: () => Promise<{ hotkey: string }>;
   setOverlayHotkey: (accel: string) => Promise<{ ok: boolean; hotkey: string }>;
   // In-Game Coach
