@@ -3,6 +3,7 @@ import { api } from '../lib/api';
 import { championSquare, profileIcon } from '../lib/ddragon';
 import { Card, SectionTitle, EmptyState } from '../components/common';
 import { OverlaySettings } from '../components/OverlaySettings';
+import { MatchHistory } from '../components/MatchHistory';
 import type { Summoner, ChampionMastery } from '../../shared/types';
 
 const REGIONS = ['LA2', 'LA1', 'NA1', 'BR1', 'EUW1', 'EUN1', 'KR', 'JP1'];
@@ -202,6 +203,13 @@ export const SummonerView: React.FC = () => {
               ))}
             </div>
           )}
+        </Card>
+      )}
+
+      {/* Match history */}
+      {summoner && (
+        <Card className="p-4">
+          <MatchHistory summoner={summoner} />
         </Card>
       )}
     </div>

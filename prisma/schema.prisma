@@ -119,6 +119,7 @@ model Participant {
   teamId                      Int
   championId                  Int
   summonerId                  String?
+  puuid                       String?
   summonerName                String
   participantId               Int
   kills                       Int
@@ -156,6 +157,7 @@ model Participant {
 
   @@index([summonerId, championId])
   @@index([matchId, teamId])
+  @@index([puuid])
 }
 
 model Item {

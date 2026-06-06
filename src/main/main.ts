@@ -149,9 +149,12 @@ function registerIpcHandlers() {
   ipcMain.handle('champions:get-by-id', (_e, id: number) => ChampionRepository.findById(id));
 
   // ── Match History ─────────────────────────────────────────────────────────
-  ipcMain.handle('matches:get', (_e, summonerId: string, limit?: number) =>
-    MatchRepository.findBySummonerId(summonerId, limit),
-  );
+  // Identifier is the internal Summoner.id; matches are linked by PUUID.
+  ipcMain.handle('matches:get', async (_e, id: string, limit?: number) => {
+    const summoner = await SummonerRepository.findById(id);
+    if (!summoner) return [];
+    return MatchRepository.findByPuuid(summoner.puuid, limit);
+  });
 
   ipcMain.handle('matches:sync', async (_e, id: string, count = 10) => {
     const summoner = await SummonerRepository.findById(id);
@@ -201,7 +204,9 @@ function registerIpcHandlers() {
           participants: info.participants.map((p: any) => ({
             teamId: p.teamId,
             championId: p.championId,
-            summonerId: p.summonerId || undefined,
+            // Riot's encrypted summonerId is gone; link by PUUID instead.
+            summonerId: undefined,
+            puuid: p.puuid ?? undefined,
             summonerName: p.summonerName ?? p.riotIdGameName ?? '',
             participantId: p.participantId,
             kills: p.kills,

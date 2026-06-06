@@ -33,6 +33,7 @@ export interface CreateMatchData {
     teamId: number;
     championId: number;
     summonerId?: string;
+    puuid?: string;
     summonerName: string;
     participantId: number;
     kills: number;
@@ -84,10 +85,10 @@ export class MatchRepository {
     return count > 0;
   }
 
-  static async findBySummonerId(summonerId: string, limit = 20) {
+  static async findByPuuid(puuid: string, limit = 20) {
     const prisma = await DatabaseClient.getInstance();
     return prisma.match.findMany({
-      where: { participants: { some: { summonerId } } },
+      where: { participants: { some: { puuid } } },
       include: {
         teams: { include: { bans: true } },
         participants: true,
@@ -136,6 +137,7 @@ export class MatchRepository {
             teamId: p.teamId,
             championId: p.championId,
             summonerId: p.summonerId,
+            puuid: p.puuid,
             summonerName: p.summonerName,
             participantId: p.participantId,
             kills: p.kills,
