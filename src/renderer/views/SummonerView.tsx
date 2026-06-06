@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { championSquare, profileIcon } from '../lib/ddragon';
 import { Card, SectionTitle, EmptyState } from '../components/common';
-import { HotkeyCapture } from '../components/HotkeyCapture';
+import { OverlaySettings } from '../components/OverlaySettings';
 import type { Summoner, ChampionMastery } from '../../shared/types';
 
 const REGIONS = ['LA2', 'LA1', 'NA1', 'BR1', 'EUW1', 'EUN1', 'KR', 'JP1'];
@@ -111,13 +111,10 @@ export const SummonerView: React.FC = () => {
         </p>
       </Card>
 
-      {/* Settings */}
+      {/* Overlay settings */}
       <Card className="p-4">
-        <SectionTitle>Atajo del overlay</SectionTitle>
-        <HotkeyCapture />
-        <p className="text-xs text-text-muted mt-2">
-          Tocá el botón y presioná la combinación (necesita al menos un modificador, ej. Ctrl o Alt).
-        </p>
+        <SectionTitle>Overlay</SectionTitle>
+        <OverlaySettings />
       </Card>
 
       {/* Search */}

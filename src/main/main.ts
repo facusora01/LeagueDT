@@ -401,15 +401,18 @@ function registerOverlayShortcut(accel: string): boolean {
   let ok = false;
   try {
     ok = globalShortcut.register(accel, () => setOverlay(!isOverlay));
-  } catch {
+  } catch (err) {
+    console.error('[Overlay] register threw for', accel, err);
     ok = false;
   }
   if (ok) {
     overlayHotkey = accel;
+    console.log('[Overlay] hotkey registered:', accel);
     return true;
   }
   // Revert to the previous binding.
   globalShortcut.register(overlayHotkey, () => setOverlay(!isOverlay));
+  console.warn('[Overlay] failed to register', accel, '— kept', overlayHotkey);
   return false;
 }
 

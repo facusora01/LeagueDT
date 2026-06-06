@@ -2,9 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 
 // Maps a browser KeyboardEvent to an Electron accelerator string.
+// Uses e.code (physical key) so modifiers/layouts don't mangle the result
+// (e.g. Alt+O yields a dead char in e.key but "KeyO" in e.code).
 function toAccelerator(e: React.KeyboardEvent): string | null {
-  const key = e.key;
-  if (['Control', 'Shift', 'Alt', 'Meta'].includes(key)) return null; // wait for a real key
+  const code = e.code;
+  if (/^(Control|Shift|Alt|Meta|OS)(Left|Right)?$/.test(code)) return null;
 
   const parts: string[] = [];
   if (e.ctrlKey || e.metaKey) parts.push('CommandOrControl');
@@ -12,12 +14,21 @@ function toAccelerator(e: React.KeyboardEvent): string | null {
   if (e.shiftKey) parts.push('Shift');
   if (parts.length === 0) return null; // require at least one modifier
 
-  const named: Record<string, string> = {
-    ' ': 'Space',
-    ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right',
-    Escape: 'Escape', Enter: 'Enter', Tab: 'Tab',
-  };
-  const main = named[key] ?? (key.length === 1 ? key.toUpperCase() : key);
+  let main: string | null = null;
+  let m: RegExpMatchArray | null;
+  if ((m = code.match(/^Key([A-Z])$/))) main = m[1];
+  else if ((m = code.match(/^Digit(\d)$/))) main = m[1];
+  else if ((m = code.match(/^F(\d{1,2})$/))) main = `F${m[1]}`;
+  else {
+    const named: Record<string, string> = {
+      Space: 'Space', Enter: 'Enter', Tab: 'Tab', Backslash: '\\',
+      ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right',
+      Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']',
+    };
+    main = named[code] ?? null;
+  }
+  if (!main) return null;
+
   parts.push(main);
   return parts.join('+');
 }
