@@ -73,14 +73,18 @@ export function generateTips(
   }
 
   // ── CS deficit ──────────────────────────────────────────────────────────────
+  // Supports don't farm minions, so the CS benchmark doesn't apply to them.
+  const pos = (state.localPlayer.position || '').toUpperCase();
+  const isSupport = pos === 'UTILITY' || pos === 'SUPPORT';
   const minElapsed = t / 60;
-  if (minElapsed >= 3) {
+  if (minElapsed >= 3 && !isSupport) {
     const expectedCS = Math.floor(minElapsed * CS_PER_MIN_TARGET);
     const csDeficit = expectedCS - state.localPlayer.cs;
-    const tipId = `cs:${Math.floor(t / 60)}`;
+    // Re-evaluate at most every 3 minutes to avoid spamming the same advice.
+    const tipId = `cs:${Math.floor(t / 180)}`;
 
-    if (csDeficit >= 20 && !ctx.shownTipIds.has(tipId)) {
-      const priority: TipPriority = csDeficit >= 40 ? 'high' : 'medium';
+    if (csDeficit >= 25 && !ctx.shownTipIds.has(tipId)) {
+      const priority: TipPriority = csDeficit >= 50 ? 'high' : 'medium';
       tips.push(makeTip(tipId, 'micro', priority, `CS bajo: ${state.localPlayer.cs} (esperado ~${expectedCS}). Enfocate en farmear minions`));
       ctx.shownTipIds.add(tipId);
     }

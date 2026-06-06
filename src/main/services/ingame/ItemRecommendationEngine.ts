@@ -58,10 +58,27 @@ const ITEMS: Record<string, ItemSuggestion & { tags: string[] }> = {
 
 const ALL_ITEMS = Object.values(ITEMS);
 
+// All tier-2 boots + basic boots — used to detect that boots are already owned
+// (the catalogue above only lists a few, so check against the full set).
+const BOOTS_IDS = new Set([1001, 3006, 3009, 3010, 3020, 3047, 3111, 3117, 3158, 2422, 3013]);
+// Trinkets/wards occupy a slot but don't count toward the 6 item slots.
+const TRINKET_IDS = new Set([3340, 3363, 3364, 3330, 3865, 2055, 2052]);
+
 export function recommendItems(input: ItemInput): ItemBuildRecommendation {
   const phase = getPhase(input.gameTime);
   const buildStyle = getBuildStyle(input.goldAdvantage, input.enemyHasHealing);
   const champType = getChampType(input.championTags);
+
+  // If all 6 item slots are filled, nothing new can be bought.
+  const filledSlots = input.ownedItemIds.filter(id => id && !TRINKET_IDS.has(id)).length;
+  if (filledSlots >= 6) {
+    return {
+      phase,
+      buildStyle,
+      items: [],
+      reasoning: 'Build completa — no hay slots libres para nuevos items.',
+    };
+  }
 
   const selected: ItemSuggestion[] = [];
 
@@ -114,9 +131,7 @@ export function recommendItems(input: ItemInput): ItemBuildRecommendation {
   }
 
   // ── 6. Boots if not owned ────────────────────────────────────────────────
-  const ownBoots = ALL_ITEMS
-    .filter(i => i.tags.includes('boots'))
-    .some(b => input.ownedItemIds.includes(b.itemId));
+  const ownBoots = input.ownedItemIds.some(id => BOOTS_IDS.has(id));
   if (!ownBoots) {
     if (champType === 'ap') addIfNotOwned(selected, ITEMS['sorceresShoes'], input.ownedItemIds);
     else if (champType === 'marksman') addIfNotOwned(selected, ITEMS['berserkGreaves'], input.ownedItemIds);
@@ -177,8 +192,9 @@ function buildReasoning(
   goldAdv: number,
 ): string {
   const parts: string[] = [`Fase: ${phase}`];
-  if (goldAdv > 2000) parts.push(`estás ${goldAdv}g adelante — maximizá daño`);
-  else if (goldAdv < -1000) parts.push(`estás ${Math.abs(goldAdv)}g atrás — priorizar durabilidad`);
+  const adv = Math.round(goldAdv);
+  if (adv > 2000) parts.push(`estás ${adv.toLocaleString()}g adelante — maximizá daño`);
+  else if (adv < -1000) parts.push(`estás ${Math.abs(adv).toLocaleString()}g atrás — priorizar durabilidad`);
   if (antiHeal) parts.push('enemigo con healing — anti-heal obligatorio');
   return parts.join('. ') + '.';
 }

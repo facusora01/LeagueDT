@@ -71,7 +71,7 @@ export const IngameView: React.FC = () => {
         {lp.currentGold !== undefined && (
           <div className="text-right">
             <p className="text-xs text-text-muted">Oro</p>
-            <p className="text-secondary font-medium">{lp.currentGold.toLocaleString()}</p>
+            <p className="text-secondary font-medium">{Math.round(lp.currentGold ?? 0).toLocaleString()}</p>
           </div>
         )}
       </Card>
