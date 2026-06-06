@@ -59,16 +59,31 @@ export interface ThreatLike {
   threatLevel: string;
 }
 
+const THREAT_SHORT: Record<string, string> = {
+  extreme: 'EXT', high: 'ALTA', medium: 'MED', low: 'BAJA',
+};
+const THREAT_DOT: Record<string, string> = {
+  extreme: 'bg-destructive', high: 'bg-destructive', medium: 'bg-warning', low: 'bg-info',
+};
+// Literal class strings so Tailwind detects them (no runtime composition).
+const THREAT_COMPACT: Record<string, string> = {
+  extreme: 'text-destructive bg-destructive/20',
+  high: 'text-destructive bg-destructive/20',
+  medium: 'text-warning bg-warning/20',
+  low: 'text-info bg-info/20',
+};
+
 export const ThreatsContent: React.FC<{ box: PanelBox; threats: ThreatLike[] }> = ({ box, threats }) => {
-  const showName = box.w >= 175;       // below this: only image + badge
+  const showName = box.w >= 200;       // below: image + badge only
   const showHeader = box.h >= 70;
+  const tiny = box.w < 120;            // below: image + colored dot only
   const rows = maxRows(box, showHeader);
   return (
     <>
       {showHeader && <Header>Amenazas</Header>}
       <div className="space-y-1">
         {threats.slice(0, rows).map(t => (
-          <div key={t.summonerName} className="flex items-center gap-1.5">
+          <div key={t.summonerName} className="flex items-center gap-1.5 min-w-0">
             <img
               src={championSquareByName(t.championName)}
               alt=""
@@ -76,8 +91,16 @@ export const ThreatsContent: React.FC<{ box: PanelBox; threats: ThreatLike[] }> 
               onError={imgErr}
             />
             {showName && <span className="text-xs flex-1 truncate">{t.championName}</span>}
-            <span className={showName ? '' : 'ml-auto'}>
-              <ThreatBadge level={t.threatLevel} />
+            <span className={`shrink-0 ${showName ? '' : 'ml-auto'}`}>
+              {tiny ? (
+                <span className={`block w-2.5 h-2.5 rounded-full ${THREAT_DOT[t.threatLevel] ?? 'bg-info'}`} />
+              ) : showName ? (
+                <ThreatBadge level={t.threatLevel} />
+              ) : (
+                <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${THREAT_COMPACT[t.threatLevel] ?? THREAT_COMPACT.low}`}>
+                  {THREAT_SHORT[t.threatLevel] ?? '?'}
+                </span>
+              )}
             </span>
           </div>
         ))}
