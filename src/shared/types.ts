@@ -34,6 +34,8 @@ export interface ElectronAPI {
   toggleOverlay: () => Promise<{ overlay: boolean }>;
   getOverlay: () => Promise<{ overlay: boolean }>;
   onOverlayChanged: (cb: (on: boolean) => void) => void;
+  getOverlayHotkey: () => Promise<{ hotkey: string }>;
+  setOverlayHotkey: (accel: string) => Promise<{ ok: boolean; hotkey: string }>;
   // In-Game Coach
   startIngameCoach: () => Promise<{ ok: boolean }>;
   stopIngameCoach: () => Promise<{ ok: boolean }>;

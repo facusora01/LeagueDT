@@ -16,6 +16,8 @@ import { mockChampSelectSession, mockBanPhaseSession, mockLiveGameData } from '.
 let mainWindow: BrowserWindow | null = null;
 let isOverlay = false;
 let normalBounds: Rectangle | null = null;
+const DEFAULT_HOTKEY = 'CommandOrControl+Shift+O';
+let overlayHotkey = DEFAULT_HOTKEY;
 const lcuConnector = new LcuConnector();
 const riotClient = new RiotApiClient();
 const draftSession = new DraftSession();
@@ -40,9 +42,16 @@ function createWindow() {
     process.env.NODE_ENV === 'development' ||
     !app.isPackaged;
 
+  // Open DevTools on demand with F12 (the frameless window has no menu).
+  mainWindow.webContents.on('before-input-event', (_event, input) => {
+    if (input.type === 'keyDown' && input.key === 'F12') {
+      mainWindow?.webContents.toggleDevTools();
+    }
+  });
+
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
+    // DevTools no longer auto-opens — use F12 when needed.
   } else {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
   }
@@ -265,6 +274,12 @@ function registerIpcHandlers() {
   // ── Overlay ───────────────────────────────────────────────────────────────
   ipcMain.handle('overlay:toggle', () => { setOverlay(!isOverlay); return { overlay: isOverlay }; });
   ipcMain.handle('overlay:get', () => ({ overlay: isOverlay }));
+  ipcMain.handle('overlay:get-hotkey', () => ({ hotkey: overlayHotkey }));
+  ipcMain.handle('overlay:set-hotkey', async (_e, accel: string) => {
+    const ok = registerOverlayShortcut(accel);
+    if (ok) await SettingsRepository.updateSettings({ overlayHotkey: accel });
+    return { ok, hotkey: overlayHotkey };
+  });
 }
 
 function wireIngameEvents() {
@@ -379,14 +394,30 @@ function setOverlay(on: boolean) {
   mainWindow.webContents.send('overlay:changed', isOverlay);
 }
 
+// Registers the overlay toggle accelerator, reverting to the previous one
+// if the new accelerator is invalid or already taken by another app.
+function registerOverlayShortcut(accel: string): boolean {
+  globalShortcut.unregister(overlayHotkey);
+  let ok = false;
+  try {
+    ok = globalShortcut.register(accel, () => setOverlay(!isOverlay));
+  } catch {
+    ok = false;
+  }
+  if (ok) {
+    overlayHotkey = accel;
+    return true;
+  }
+  // Revert to the previous binding.
+  globalShortcut.register(overlayHotkey, () => setOverlay(!isOverlay));
+  return false;
+}
+
 app.whenReady().then(async () => {
   registerIpcHandlers();
   wireIngameEvents();
   wireDraftEvents();
   createWindow();
-
-  // Global hotkey to toggle the in-game overlay.
-  globalShortcut.register('CommandOrControl+Shift+O', () => setOverlay(!isOverlay));
 
   // Initialize DataDragon in background; after done, seed draft session with static data
   dataDragon = new DataDragonManager(app.getPath('userData'));
@@ -399,11 +430,12 @@ app.whenReady().then(async () => {
     console.log(`[Draft] Loaded ${champions.length} champions into draft session`);
   }).catch(err => console.error('[DataDragon] Init error:', err));
 
-  // Apply saved API key if present
+  // Apply saved API key + overlay hotkey if present
   const settings = await SettingsRepository.getSettings();
   if ((settings as any).apiKey) {
     riotClient.setApiKey((settings as any).apiKey);
   }
+  registerOverlayShortcut((settings as any).overlayHotkey || DEFAULT_HOTKEY);
 
   // Start draft detector (wires LCU events → draftSession)
   new LcuDraftDetector(lcuConnector, draftSession);

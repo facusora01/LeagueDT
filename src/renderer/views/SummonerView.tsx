@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { championSquare, profileIcon } from '../lib/ddragon';
 import { Card, SectionTitle, EmptyState } from '../components/common';
+import { HotkeyCapture } from '../components/HotkeyCapture';
 import type { Summoner, ChampionMastery } from '../../shared/types';
 
 const REGIONS = ['LA2', 'LA1', 'NA1', 'BR1', 'EUW1', 'EUN1', 'KR', 'JP1'];
@@ -107,6 +108,15 @@ export const SummonerView: React.FC = () => {
         </div>
         <p className="text-xs text-text-muted mt-2">
           Se obtiene en developer.riotgames.com. Las dev keys expiran cada 24h.
+        </p>
+      </Card>
+
+      {/* Settings */}
+      <Card className="p-4">
+        <SectionTitle>Atajo del overlay</SectionTitle>
+        <HotkeyCapture />
+        <p className="text-xs text-text-muted mt-2">
+          Tocá el botón y presioná la combinación (necesita al menos un modificador, ej. Ctrl o Alt).
         </p>
       </Card>
 

@@ -51,6 +51,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getOverlay: () => ipcRenderer.invoke('overlay:get'),
   onOverlayChanged: (cb: (on: boolean) => void) =>
     ipcRenderer.on('overlay:changed', (_e, on) => cb(on)),
+  getOverlayHotkey: () => ipcRenderer.invoke('overlay:get-hotkey'),
+  setOverlayHotkey: (accel: string) => ipcRenderer.invoke('overlay:set-hotkey', accel),
 
   // ── In-Game Coach ─────────────────────────────────────────────────────────
   startIngameCoach: () => ipcRenderer.invoke('ingame:start'),
