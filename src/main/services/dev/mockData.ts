@@ -5,13 +5,13 @@
 /** Builds an LCU champ-select session in the picking phase, local player on the clock. */
 export function mockChampSelectSession(championIds: number[]) {
   // championIds: a handful of real, seeded champion IDs.
-  const [allyA, allyB, enemyA, enemyB, banA, banB] = championIds;
+  const [allyA, allyB, enemyA, enemyB, banA, banB, localPick] = championIds;
 
   return {
     localPlayerCellId: 0,
     timer: { phase: 'BAN_PICK', adjustedTimeLeftInPhase: 27000 },
     myTeam: [
-      { cellId: 0, championId: 0 },        // local player — picking now
+      { cellId: 0, championId: localPick ?? 0 }, // local player (drives rune suggestion)
       { cellId: 1, championId: allyA },
       { cellId: 2, championId: allyB },
       { cellId: 3, championId: 0 },

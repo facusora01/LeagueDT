@@ -52,6 +52,19 @@ export interface ElectronAPI {
   onDraftStateChanged: (cb: (state: DraftStateDTO) => void) => void;
   onDraftRecommendations: (cb: (recs: ChampionRecDTO[]) => void) => void;
   onDraftBanSuggestions: (cb: (bans: BanSugDTO[]) => void) => void;
+  onDraftRuneSuggestion: (cb: (runes: RuneRecDTO | null) => void) => void;
+}
+
+export interface RuneRefDTO {
+  id: number;
+  name: string;
+}
+
+export interface RuneRecDTO {
+  primaryTree: RuneRefDTO;
+  keystone: RuneRefDTO;
+  secondaryTree: RuneRefDTO;
+  reasoning: string;
 }
 
 // ─── Renderer DTOs (shapes pushed over IPC) ──────────────────────────────────

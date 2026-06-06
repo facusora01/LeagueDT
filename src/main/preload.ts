@@ -74,4 +74,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('draft:recommendations', (_e, recs) => cb(recs)),
   onDraftBanSuggestions: (cb: (bans: any[]) => void) =>
     ipcRenderer.on('draft:ban-suggestions', (_e, bans) => cb(bans)),
+  onDraftRuneSuggestion: (cb: (runes: any | null) => void) =>
+    ipcRenderer.on('draft:rune-suggestion', (_e, runes) => cb(runes)),
 });

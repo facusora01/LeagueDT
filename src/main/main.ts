@@ -322,6 +322,9 @@ function wireDraftEvents() {
   draftSession.on('banSuggestions', bans => {
     mainWindow?.webContents.send('draft:ban-suggestions', bans);
   });
+  draftSession.on('runeSuggestion', runes => {
+    mainWindow?.webContents.send('draft:rune-suggestion', runes);
+  });
 }
 
 // Reads the logged-in account straight from the League client (no API key

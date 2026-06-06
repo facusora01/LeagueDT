@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import { generateRecommendations, type ChampionData, type MasteryData, type ChampionRecommendation } from './ChampionRecommendationEngine';
 import { generateBanSuggestions, type BanSuggestion } from './BanAdvisor';
+import { recommendRunes, type RuneRecommendation } from './RuneRecommendationEngine';
 
 export type DraftPhase = 'idle' | 'banning' | 'picking' | 'finished';
 
@@ -18,6 +19,7 @@ export interface DraftSessionEvents {
   stateChanged: (state: DraftState) => void;
   recommendations: (recs: ChampionRecommendation[]) => void;
   banSuggestions: (bans: BanSuggestion[]) => void;
+  runeSuggestion: (runes: RuneRecommendation | null) => void;
 }
 
 export class DraftSession extends EventEmitter {
@@ -35,6 +37,7 @@ export class DraftSession extends EventEmitter {
   private masteries: MasteryData[] = [];
   private highPriorityMeta: number[] = [];
   private simulating = false;
+  private lastRuneChampId = 0;
 
   setStaticData(champions: ChampionData[], masteries: MasteryData[], meta: number[] = []) {
     this.allChampions = champions;
@@ -117,6 +120,14 @@ export class DraftSession extends EventEmitter {
     this.state = { phase, allyPicks, enemyPicks, allyBans, enemyBans, localCellId, isMyTurn };
     this.emit('stateChanged', this.state);
 
+    // Rune page for the local player's champion (re-emit only on change).
+    const localChampId: number = myTeam.find((p: any) => p.cellId === localCellId)?.championId ?? 0;
+    if (localChampId !== this.lastRuneChampId) {
+      this.lastRuneChampId = localChampId;
+      const champ = localChampId ? this.toChampionData(localChampId) : null;
+      this.emit('runeSuggestion', champ ? recommendRunes(champ.tags) : null);
+    }
+
     // Generate recommendations when it's our turn
     if (isMyTurn || phase !== prevPhase) {
       this.computeRecommendations();
@@ -159,6 +170,7 @@ export class DraftSession extends EventEmitter {
     // Ignore the real poller's resets while a simulation is active.
     if (this.simulating && !force) return;
     this.simulating = false;
+    this.lastRuneChampId = 0;
     this.state = {
       phase: 'idle',
       allyPicks: [],

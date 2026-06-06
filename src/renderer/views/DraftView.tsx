@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { championSquare } from '../lib/ddragon';
 import { Card, SectionTitle, ScoreBar, EmptyState } from '../components/common';
-import type { DraftStateDTO, ChampionRecDTO, BanSugDTO } from '../../shared/types';
+import type { DraftStateDTO, ChampionRecDTO, BanSugDTO, RuneRecDTO } from '../../shared/types';
 
 const PHASE_LABEL: Record<string, string> = {
   idle: 'Esperando',
@@ -15,12 +15,14 @@ export const DraftView: React.FC = () => {
   const [state, setState] = useState<DraftStateDTO | null>(null);
   const [recs, setRecs] = useState<ChampionRecDTO[]>([]);
   const [bans, setBans] = useState<BanSugDTO[]>([]);
+  const [runes, setRunes] = useState<RuneRecDTO | null>(null);
 
   useEffect(() => {
     api.getDraftState().then(setState);
     api.onDraftStateChanged(setState);
     api.onDraftRecommendations(setRecs);
     api.onDraftBanSuggestions(setBans);
+    api.onDraftRuneSuggestion(setRunes);
   }, []);
 
   const phase = state?.phase ?? 'idle';
@@ -115,6 +117,31 @@ export const DraftView: React.FC = () => {
             )}
           </Card>
         </div>
+      )}
+
+      {/* Rune suggestion for the local player's champion */}
+      {!isIdle && runes && (
+        <Card className="p-4">
+          <SectionTitle>Runas Recomendadas</SectionTitle>
+          <div className="flex items-center gap-4">
+            <div className="flex flex-col items-center">
+              <span className="text-[10px] uppercase text-text-muted">Keystone</span>
+              <span className="text-secondary font-semibold">{runes.keystone.name}</span>
+            </div>
+            <div className="h-8 w-px bg-border" />
+            <div className="text-sm">
+              <div>
+                <span className="text-text-muted">Primaria: </span>
+                <span className="text-primary">{runes.primaryTree.name}</span>
+              </div>
+              <div>
+                <span className="text-text-muted">Secundaria: </span>
+                <span className="text-text-secondary">{runes.secondaryTree.name}</span>
+              </div>
+            </div>
+          </div>
+          <p className="text-xs text-text-muted mt-2">{runes.reasoning}</p>
+        </Card>
       )}
     </div>
   );
