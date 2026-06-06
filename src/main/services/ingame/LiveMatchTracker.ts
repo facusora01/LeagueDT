@@ -12,6 +12,18 @@ const POLL_INTERVAL_MS = 3000;
 // Self-signed cert on port 2999
 const httpsAgent = new https.Agent({ rejectUnauthorized: false });
 
+const AD_TAGS = ['Marksman', 'Fighter', 'Assassin'];
+
+// Champions with significant healing/sustain — triggers anti-heal suggestions.
+const HEALING_CHAMPIONS = new Set([
+  'Soraka', 'Nami', 'Sona', 'Yuumi', 'Seraphine', 'Senna', 'Taric', 'Ivern',
+  'Vladimir', 'Aatrox', 'Dr. Mundo', 'DrMundo', 'Warwick', 'Swain', 'Sylas',
+  'Fiddlesticks', 'Maokai', 'Mordekaiser', 'Briar', 'Ramus', 'Renekton',
+  'Nidalee', 'Kayn', 'Yasuo', 'Yone', 'Samira', 'Aurelion Sol',
+]);
+
+type TagResolver = (championName: string) => string[];
+
 export class LiveMatchTracker extends EventEmitter {
   private pollTimer: NodeJS.Timeout | null = null;
   private isTracking = false;
@@ -21,9 +33,15 @@ export class LiveMatchTracker extends EventEmitter {
   // Champion tags for local player — set before game starts via setLocalChampionTags()
   private localChampionTags: string[] = [];
   private simulating = false;
+  // Resolves a live champion display name to its tags (injected from main).
+  private resolveTags: TagResolver = () => [];
 
   setLocalChampionTags(tags: string[]) {
     this.localChampionTags = tags;
+  }
+
+  setChampionResolver(fn: TagResolver) {
+    this.resolveTags = fn;
   }
 
   /** Begins the persistent poll loop. Idempotent — safe to call on app start. */
@@ -93,16 +111,21 @@ export class LiveMatchTracker extends EventEmitter {
     const threats = analyzeEnemyThreats(state.enemies, state.allies);
     this.emit('threatsUpdated', threats);
 
+    // Resolve the local champion's tags from its name; fall back to whatever
+    // was set manually (e.g. by the simulator).
+    const resolved = this.resolveTags(state.localPlayer.championName);
+    const championTags = resolved.length ? resolved : this.localChampionTags;
+
     const goldAdv = this.estimateGoldAdvantage(state);
     const itemInput: ItemInput = {
-      championTags: this.localChampionTags,
+      championTags,
       ownedItemIds: state.localPlayer.items,
       currentGold: state.localPlayer.currentGold ?? 0,
       gameTime: state.gameTime,
       goldAdvantage: goldAdv,
-      enemyADCount: this.countTaggedEnemies(state.enemies, ['Marksman', 'Fighter', 'Assassin']),
+      enemyADCount: this.countTaggedEnemies(state.enemies, AD_TAGS),
       enemyAPCount: this.countTaggedEnemies(state.enemies, ['Mage']),
-      enemyHasHealing: false, // TODO: detect via champion list
+      enemyHasHealing: state.enemies.some(e => HEALING_CHAMPIONS.has(e.championName)),
     };
     this.emit('itemsUpdated', recommendItems(itemInput));
 
@@ -189,9 +212,11 @@ export class LiveMatchTracker extends EventEmitter {
     return (myItems - enemyAvgItems) * 2800 + myGold;
   }
 
-  private countTaggedEnemies(_enemies: LivePlayerStats[], _tags: string[]): number {
-    // Without champion→tags lookup at runtime, return a heuristic count
-    // This gets populated properly when champion tags are loaded
-    return _enemies.length;
+  // Counts enemies whose champion tags intersect any of the given tags.
+  private countTaggedEnemies(enemies: LivePlayerStats[], tags: string[]): number {
+    return enemies.filter(e => {
+      const t = this.resolveTags(e.championName);
+      return t.some(tag => tags.includes(tag));
+    }).length;
   }
 }

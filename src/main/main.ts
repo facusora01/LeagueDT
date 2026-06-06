@@ -448,6 +448,10 @@ app.whenReady().then(async () => {
       champions.map(c => ({ id: c.id, name: c.name, tags: c.tags })),
       [],
     );
+    // Let the in-game tracker resolve champion display names → tags so item
+    // recommendations respect the actual champion and enemy composition.
+    const tagsByName = new Map(champions.map(c => [c.name, c.tags]));
+    liveTracker.setChampionResolver(name => tagsByName.get(name) ?? []);
     console.log(`[Draft] Loaded ${champions.length} champions into draft session`);
   }).catch(err => console.error('[DataDragon] Init error:', err));
 

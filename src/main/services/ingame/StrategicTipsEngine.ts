@@ -73,12 +73,14 @@ export function generateTips(
   }
 
   // ── CS deficit ──────────────────────────────────────────────────────────────
-  // Supports don't farm minions, so the CS benchmark doesn't apply to them.
+  // Benchmark varies by role: supports don't farm; junglers farm camps at a
+  // lower rate than solo lanes.
   const pos = (state.localPlayer.position || '').toUpperCase();
   const isSupport = pos === 'UTILITY' || pos === 'SUPPORT';
+  const csTarget = pos === 'JUNGLE' ? 5 : CS_PER_MIN_TARGET;
   const minElapsed = t / 60;
   if (minElapsed >= 3 && !isSupport) {
-    const expectedCS = Math.floor(minElapsed * CS_PER_MIN_TARGET);
+    const expectedCS = Math.floor(minElapsed * csTarget);
     const csDeficit = expectedCS - state.localPlayer.cs;
     // Re-evaluate at most every 3 minutes to avoid spamming the same advice.
     const tipId = `cs:${Math.floor(t / 180)}`;
