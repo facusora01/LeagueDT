@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, globalShortcut, screen, Rectangle } from 'electron';
 import * as path from 'path';
 import { LcuConnector } from './api/lcu/LcuConnector';
 import { DataDragonManager } from './api/datadragon/DataDragonManager';
@@ -14,6 +14,8 @@ import { LiveMatchTracker } from './services/ingame/LiveMatchTracker';
 import { mockChampSelectSession, mockBanPhaseSession, mockLiveGameData } from './services/dev/mockData';
 
 let mainWindow: BrowserWindow | null = null;
+let isOverlay = false;
+let normalBounds: Rectangle | null = null;
 const lcuConnector = new LcuConnector();
 const riotClient = new RiotApiClient();
 const draftSession = new DraftSession();
@@ -259,6 +261,10 @@ function registerIpcHandlers() {
     draftSession.reset(true);
     return { ok: true };
   });
+
+  // ── Overlay ───────────────────────────────────────────────────────────────
+  ipcMain.handle('overlay:toggle', () => { setOverlay(!isOverlay); return { overlay: isOverlay }; });
+  ipcMain.handle('overlay:get', () => ({ overlay: isOverlay }));
 }
 
 function wireIngameEvents() {
@@ -350,11 +356,37 @@ async function loadCurrentSummonerFromLcu() {
   }
 }
 
+// Toggles the window between normal and a full-screen, click-through,
+// always-on-top overlay that sits over the game.
+function setOverlay(on: boolean) {
+  if (!mainWindow || on === isOverlay) return;
+  isOverlay = on;
+
+  if (on) {
+    normalBounds = mainWindow.getBounds();
+    const display = screen.getPrimaryDisplay();
+    mainWindow.setBounds(display.bounds);
+    mainWindow.setAlwaysOnTop(true, 'screen-saver');
+    mainWindow.setIgnoreMouseEvents(true, { forward: true });
+    mainWindow.setResizable(false);
+  } else {
+    mainWindow.setIgnoreMouseEvents(false);
+    mainWindow.setAlwaysOnTop(false);
+    mainWindow.setResizable(true);
+    if (normalBounds) mainWindow.setBounds(normalBounds);
+  }
+
+  mainWindow.webContents.send('overlay:changed', isOverlay);
+}
+
 app.whenReady().then(async () => {
   registerIpcHandlers();
   wireIngameEvents();
   wireDraftEvents();
   createWindow();
+
+  // Global hotkey to toggle the in-game overlay.
+  globalShortcut.register('CommandOrControl+Shift+O', () => setOverlay(!isOverlay));
 
   // Initialize DataDragon in background; after done, seed draft session with static data
   dataDragon = new DataDragonManager(app.getPath('userData'));
@@ -396,6 +428,10 @@ app.whenReady().then(async () => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
 });
 
 app.on('window-all-closed', () => {

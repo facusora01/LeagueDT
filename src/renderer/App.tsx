@@ -6,6 +6,7 @@ import { Sidebar, type ViewId } from './components/Sidebar';
 import { SummonerView } from './views/SummonerView';
 import { DraftView } from './views/DraftView';
 import { IngameView } from './views/IngameView';
+import { OverlayView } from './views/OverlayView';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewId>('summoner');
@@ -13,6 +14,7 @@ const App: React.FC = () => {
   const [ddVersion, setDdVersion] = useState<string | null>(null);
   const [draftActive, setDraftActive] = useState(false);
   const [gameActive, setGameActive] = useState(false);
+  const [overlay, setOverlay] = useState(false);
 
   useEffect(() => {
     if (!hasApi) return;
@@ -37,7 +39,16 @@ const App: React.FC = () => {
     });
     api.onGameStarted(() => { setGameActive(true); setView('ingame'); });
     api.onGameEnded(() => setGameActive(false));
+
+    // Overlay mode toggled via global hotkey (Ctrl+Shift+O)
+    api.getOverlay().then(s => setOverlay(s.overlay));
+    api.onOverlayChanged(setOverlay);
   }, []);
+
+  // Make the page background transparent while in overlay mode.
+  useEffect(() => {
+    document.body.style.background = overlay ? 'transparent' : '';
+  }, [overlay]);
 
   if (!hasApi) {
     return (
@@ -45,6 +56,10 @@ const App: React.FC = () => {
         Ejecutando fuera de Electron — sin acceso a electronAPI.
       </div>
     );
+  }
+
+  if (overlay) {
+    return <OverlayView />;
   }
 
   return (

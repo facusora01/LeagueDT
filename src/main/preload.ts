@@ -46,6 +46,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   simulateGame: () => ipcRenderer.invoke('dev:simulate-game'),
   stopSimulation: () => ipcRenderer.invoke('dev:stop-sim'),
 
+  // ── Overlay ───────────────────────────────────────────────────────────────
+  toggleOverlay: () => ipcRenderer.invoke('overlay:toggle'),
+  getOverlay: () => ipcRenderer.invoke('overlay:get'),
+  onOverlayChanged: (cb: (on: boolean) => void) =>
+    ipcRenderer.on('overlay:changed', (_e, on) => cb(on)),
+
   // ── In-Game Coach ─────────────────────────────────────────────────────────
   startIngameCoach: () => ipcRenderer.invoke('ingame:start'),
   stopIngameCoach:  () => ipcRenderer.invoke('ingame:stop'),

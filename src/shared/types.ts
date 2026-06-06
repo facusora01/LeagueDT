@@ -30,6 +30,10 @@ export interface ElectronAPI {
   simulateDraft: (phase: 'pick' | 'ban') => Promise<{ ok: boolean }>;
   simulateGame: () => Promise<{ ok: boolean }>;
   stopSimulation: () => Promise<{ ok: boolean }>;
+  // Overlay
+  toggleOverlay: () => Promise<{ overlay: boolean }>;
+  getOverlay: () => Promise<{ overlay: boolean }>;
+  onOverlayChanged: (cb: (on: boolean) => void) => void;
   // In-Game Coach
   startIngameCoach: () => Promise<{ ok: boolean }>;
   stopIngameCoach: () => Promise<{ ok: boolean }>;

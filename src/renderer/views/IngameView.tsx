@@ -68,12 +68,21 @@ export const IngameView: React.FC = () => {
             </p>
           </div>
         </div>
-        {lp.currentGold !== undefined && (
-          <div className="text-right">
-            <p className="text-xs text-text-muted">Oro</p>
-            <p className="text-secondary font-medium">{Math.round(lp.currentGold ?? 0).toLocaleString()}</p>
-          </div>
-        )}
+        <div className="flex items-center gap-4">
+          {lp.currentGold !== undefined && (
+            <div className="text-right">
+              <p className="text-xs text-text-muted">Oro</p>
+              <p className="text-secondary font-medium">{Math.round(lp.currentGold ?? 0).toLocaleString()}</p>
+            </div>
+          )}
+          <button
+            onClick={() => api.toggleOverlay()}
+            title="Atajo: Ctrl+Shift+O"
+            className="px-3 py-2 bg-primary/20 text-primary border border-primary/30 rounded-md text-sm hover:bg-primary/30 transition-colors"
+          >
+            Overlay
+          </button>
+        </div>
       </Card>
 
       <div className="grid grid-cols-2 gap-4">
