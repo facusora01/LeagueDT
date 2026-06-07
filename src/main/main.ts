@@ -9,6 +9,7 @@ import { SummonerRepository } from './database/repositories/SummonerRepository';
 import { ChampionRepository } from './database/repositories/ChampionRepository';
 import { ChampionMasteryRepository } from './database/repositories/ChampionMasteryRepository';
 import { MatchRepository } from './database/repositories/MatchRepository';
+import { ItemRepository } from './database/repositories/ItemRepository';
 import { DraftSession } from './services/draft/DraftSession';
 import { LcuDraftDetector } from './services/draft/LcuDraftDetector';
 import { LiveMatchTracker } from './services/ingame/LiveMatchTracker';
@@ -452,7 +453,11 @@ app.whenReady().then(async () => {
     // recommendations respect the actual champion and enemy composition.
     const tagsByName = new Map(champions.map(c => [c.name, c.tags]));
     liveTracker.setChampionResolver(name => tagsByName.get(name) ?? []);
-    console.log(`[Draft] Loaded ${champions.length} champions into draft session`);
+    // Seed item recipes so item swap advice never sells a component of the very
+    // item it recommends (e.g. selling a Long Sword that builds into it).
+    const items = await ItemRepository.findAll();
+    liveTracker.setItemRecipes(items.map(i => ({ id: i.id, from: i.from })));
+    console.log(`[Draft] Loaded ${champions.length} champions, ${items.length} item recipes`);
   }).catch(err => console.error('[DataDragon] Init error:', err));
 
   // Apply saved API key + overlay hotkey if present

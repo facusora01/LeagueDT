@@ -108,6 +108,30 @@ describe('recommendItems', () => {
     }
   });
 
+  test('never sells a component of the item it recommends', () => {
+    // Slots full, but two of them (1038 B.F. Sword) are components of Infinity
+    // Edge (3031), which the engine wants for a fed AD. It must not tell us to
+    // sell a B.F. Sword to buy Infinity Edge.
+    const result = recommendItems(baseInput({
+      championTags: ['Fighter'],
+      ownedItemIds: [1038, 1038, 1018, 1037, 1043, 3035], // 6 slots, 2x B.F. Sword
+      goldAdvantage: 3000,
+      componentsOf: (id) => (id === 3031 ? [1038, 1018] : []),
+    }));
+    expect(result.swaps.every(s => s.outItemId !== 1038)).toBe(true);
+  });
+
+  test('recommends completing an in-progress item instead of selling, at 6 slots', () => {
+    const result = recommendItems(baseInput({
+      championTags: ['Fighter'],
+      ownedItemIds: [1038, 1018, 1037, 1043, 3035, 3134], // 6 slots, IE components
+      goldAdvantage: 3000,
+      componentsOf: (id) => (id === 3031 ? [1038, 1018] : []),
+    }));
+    // Infinity Edge offered as a completion buy, not a swap.
+    expect(result.items.some(i => i.itemId === 3031)).toBe(true);
+  });
+
   test('non-full build has no swaps', () => {
     const result = recommendItems(baseInput({ ownedItemIds: [3020] }));
     expect(result.swaps).toHaveLength(0);

@@ -82,16 +82,12 @@ export class DraftSession extends EventEmitter {
     const allyBans: number[] = [];
     const enemyBans: number[] = [];
     let isMyTurn = false;
-    let phase: DraftPhase = 'idle';
 
-    // Determine phase and whose turn it is
-    if (timer?.phase === 'BAN_PICK') {
-      phase = 'picking';
-    } else if (timer?.phase === 'PLANNING') {
-      phase = 'banning';
-    }
-
-    // Walk through actions to find bans and detect active turn
+    // Walk through actions to collect bans, detect whose turn it is, and find
+    // the action currently in progress (whoever the actor is). The in-progress
+    // action's type is the source of truth for ban vs pick — `timer.phase`
+    // strings vary across queue/draft types and aren't reliable.
+    let inProgressType: 'ban' | 'pick' | null = null;
     for (const actionGroup of actions) {
       for (const action of actionGroup) {
         if (action.type === 'ban' && action.completed) {
@@ -99,11 +95,24 @@ export class DraftSession extends EventEmitter {
           if (actor) allyBans.push(action.championId);
           else enemyBans.push(action.championId);
         }
-        if (!action.completed && action.isInProgress && action.actorCellId === localCellId) {
-          isMyTurn = true;
-          phase = action.type === 'ban' ? 'banning' : 'picking';
+        if (!action.completed && action.isInProgress) {
+          inProgressType = action.type === 'ban' ? 'ban' : 'pick';
+          if (action.actorCellId === localCellId) isMyTurn = true;
         }
       }
+    }
+
+    // A populated champ-select session is never "idle" — even when it's an
+    // enemy's turn. Derive the phase from the in-progress action, falling back
+    // to the timer only when nothing is actively in progress.
+    const hasSession = myTeam.length > 0 || actions.length > 0;
+    let phase: DraftPhase = 'idle';
+    if (hasSession) {
+      if (inProgressType === 'ban') phase = 'banning';
+      else if (inProgressType === 'pick') phase = 'picking';
+      else if (timer?.phase === 'FINALIZATION') phase = 'finished';
+      else if (timer?.phase === 'PLANNING') phase = 'banning';
+      else phase = 'picking';
     }
 
     const allyPicks = myTeam

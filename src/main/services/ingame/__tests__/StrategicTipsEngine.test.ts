@@ -114,18 +114,54 @@ describe('generateTips', () => {
     expect(ids).toContain('spike:16');
   });
 
-  test('generates elder warning after 3 dragon kills', () => {
+  test('warns a team is one dragon from Soul at 3 dragons (same team)', () => {
     const ctx = createTipsContext();
     const state = baseState({
       gameTime: 1200,
+      localPlayer: basePlayer({ summonerName: 'Me' }),
       events: [
-        { id: 1, name: 'DragonKill', time: 350 },
-        { id: 2, name: 'DragonKill', time: 660 },
-        { id: 3, name: 'DragonKill', time: 970 },
+        { id: 1, name: 'DragonKill', time: 350, killerName: 'Me' },
+        { id: 2, name: 'DragonKill', time: 660, killerName: 'Me' },
+        { id: 3, name: 'DragonKill', time: 970, killerName: 'Me' },
       ],
     });
     const tips = generateTips(state, ctx);
-    const elderTip = tips.find(t => t.id === 'elder-warning');
+    const soulTip = tips.find(t => t.id.startsWith('soul-point:'));
+    expect(soulTip).toBeDefined();
+    expect(soulTip!.priority).toBe('critical');
+  });
+
+  test('does NOT warn Elder at 3 dragons split across teams', () => {
+    const ctx = createTipsContext();
+    const state = baseState({
+      gameTime: 1200,
+      localPlayer: basePlayer({ summonerName: 'Me' }),
+      enemies: [basePlayer({ summonerName: 'Foe', team: 'CHAOS' })],
+      events: [
+        { id: 1, name: 'DragonKill', time: 350, killerName: 'Me' },
+        { id: 2, name: 'DragonKill', time: 660, killerName: 'Foe' },
+        { id: 3, name: 'DragonKill', time: 970, killerName: 'Me' },
+      ],
+    });
+    const tips = generateTips(state, ctx);
+    expect(tips.find(t => t.id === 'elder-next')).toBeUndefined();
+    expect(tips.find(t => t.id.startsWith('soul-point:'))).toBeUndefined();
+  });
+
+  test('warns Elder is next once a team secures Soul (4 dragons)', () => {
+    const ctx = createTipsContext();
+    const state = baseState({
+      gameTime: 1500,
+      localPlayer: basePlayer({ summonerName: 'Me' }),
+      events: [
+        { id: 1, name: 'DragonKill', time: 350, killerName: 'Me' },
+        { id: 2, name: 'DragonKill', time: 660, killerName: 'Me' },
+        { id: 3, name: 'DragonKill', time: 970, killerName: 'Me' },
+        { id: 4, name: 'DragonKill', time: 1280, killerName: 'Me' },
+      ],
+    });
+    const tips = generateTips(state, ctx);
+    const elderTip = tips.find(t => t.id === 'elder-next');
     expect(elderTip).toBeDefined();
     expect(elderTip!.priority).toBe('critical');
   });

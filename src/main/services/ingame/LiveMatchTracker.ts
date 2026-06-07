@@ -23,6 +23,8 @@ const HEALING_CHAMPIONS = new Set([
 ]);
 
 type TagResolver = (championName: string) => string[];
+// Direct components of an item (its `from` recipe field), by item ID.
+type ItemRecipe = { id: number; from: number[] };
 
 export class LiveMatchTracker extends EventEmitter {
   private pollTimer: NodeJS.Timeout | null = null;
@@ -35,6 +37,8 @@ export class LiveMatchTracker extends EventEmitter {
   private simulating = false;
   // Resolves a live champion display name to its tags (injected from main).
   private resolveTags: TagResolver = () => [];
+  // Direct `from` components per item ID (injected from main; DataDragon recipes).
+  private recipeFrom = new Map<number, number[]>();
 
   setLocalChampionTags(tags: string[]) {
     this.localChampionTags = tags;
@@ -43,6 +47,25 @@ export class LiveMatchTracker extends EventEmitter {
   setChampionResolver(fn: TagResolver) {
     this.resolveTags = fn;
   }
+
+  /** Seeds item recipes so item advice is recipe-aware (no selling components). */
+  setItemRecipes(items: ItemRecipe[]) {
+    this.recipeFrom = new Map(items.map(i => [i.id, i.from ?? []]));
+  }
+
+  /** Full recursive set of component item IDs that build into `itemId`. */
+  private componentsOf = (itemId: number): number[] => {
+    const out = new Set<number>();
+    const walk = (id: number) => {
+      for (const comp of this.recipeFrom.get(id) ?? []) {
+        if (out.has(comp)) continue;
+        out.add(comp);
+        walk(comp);
+      }
+    };
+    walk(itemId);
+    return [...out];
+  };
 
   /** Begins the persistent poll loop. Idempotent — safe to call on app start. */
   start() {
@@ -142,6 +165,7 @@ export class LiveMatchTracker extends EventEmitter {
       threatenedByAD,
       threatenedByAP,
       healingThreat,
+      componentsOf: this.componentsOf,
     };
     this.emit('itemsUpdated', recommendItems(itemInput));
 

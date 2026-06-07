@@ -114,12 +114,37 @@ export function generateTips(
     }
   }
 
-  // ── Elder Dragon warning ───────────────────────────────────────────────────
-  const dragonKills = state.events.filter(e => e.name === 'DragonKill').length;
-  if (dragonKills >= 3) {
-    const tipId = 'elder-warning';
+  // ── Dragon Soul / Elder Dragon warning ─────────────────────────────────────
+  // Elder only spawns after a team secures Dragon Soul, which is granted to the
+  // first team to slay 4 elemental dragons. From then on every dragon is Elder.
+  // So we track elemental kills per team, not the global total.
+  const allyNames = new Set([state.localPlayer.summonerName, ...state.allies.map(p => p.summonerName)]);
+  let allyDragons = 0;
+  let enemyDragons = 0;
+  let elderTaken = false;
+  for (const e of state.events) {
+    if (e.name !== 'DragonKill') continue;
+    if (e.dragonType === 'Elder') { elderTaken = true; continue; }
+    if (e.killerName && allyNames.has(e.killerName)) allyDragons++;
+    else enemyDragons++;
+  }
+
+  const soulTeam =
+    allyDragons >= 4 ? 'tu equipo' : enemyDragons >= 4 ? 'el equipo enemigo' : null;
+
+  if (soulTeam) {
+    // Soul is secured — the next dragon to spawn is Elder.
+    const tipId = 'elder-next';
     if (!ctx.shownTipIds.has(tipId)) {
-      tips.push(makeTip(tipId, 'macro', 'critical', `¡${dragonKills} dragones muertos! El próximo puede ser Elder — objetivo crítico`));
+      tips.push(makeTip(tipId, 'macro', 'critical', `Alma de dragón asegurada por ${soulTeam} — el próximo dragón será Elder, objetivo crítico`));
+      ctx.shownTipIds.add(tipId);
+    }
+  } else if (allyDragons === 3 || enemyDragons === 3) {
+    // A team is one dragon away from Soul.
+    const soulRace = allyDragons === 3 ? 'tu equipo' : 'el equipo enemigo';
+    const tipId = `soul-point:${soulRace}`;
+    if (!ctx.shownTipIds.has(tipId)) {
+      tips.push(makeTip(tipId, 'macro', 'critical', `${soulRace} está a 1 dragón del Alma — el próximo dragón es decisivo`));
       ctx.shownTipIds.add(tipId);
     }
   }

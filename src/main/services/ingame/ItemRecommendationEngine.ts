@@ -16,6 +16,10 @@ export interface ItemInput {
   threatenedByAD?: boolean;       // a threatening enemy deals physical
   threatenedByAP?: boolean;       // a threatening enemy deals magic
   healingThreat?: boolean;        // a threatening enemy has real sustain
+  // Resolves the full recursive set of component item IDs that build into a
+  // given finished item. Injected from main (backed by DataDragon recipes) so
+  // the engine never tells you to sell a component of the item it recommends.
+  componentsOf?: (itemId: number) => number[];
 }
 
 // ─── Item catalogue (patch-pinned, update when items change) ─────────────────
@@ -84,19 +88,38 @@ export function recommendItems(input: ItemInput): ItemBuildRecommendation {
   // The items we'd ideally want next (excludes ones already owned).
   const desired = selectItems(input, phase, buildStyle, champType, antiHeal, facingAP, facingAD);
 
-  // When all 6 slots are full we can't buy more — suggest swaps instead so the
-  // coach keeps adapting to the game (e.g. buy armor when their carry is fed).
+  // Split desired items into ones the player is already building (owns at least
+  // one component) and the rest. Finishing an in-progress item consumes its
+  // components and frees a slot, so it never requires selling anything — even
+  // when all 6 slots look full.
+  const completable: ItemSuggestion[] = [];
+  const fresh: ItemSuggestion[] = [];
+  for (const d of desired) {
+    if (ownsComponentOf(input, d.itemId)) {
+      completable.push({ ...d, priority: 'core', reason: 'Ya tenés sus componentes — completá este item' });
+    } else {
+      fresh.push(d);
+    }
+  }
+
+  // When all 6 slots are full we can't buy a brand-new item — suggest swaps so
+  // the coach keeps adapting (e.g. buy armor when their carry is fed). Items the
+  // player is mid-building are recommended as normal completions, not swaps.
   const filledSlots = input.ownedItemIds.filter(id => id && !TRINKET_IDS.has(id)).length;
   if (filledSlots >= 6) {
-    const swaps = computeSwaps(input, desired);
+    // Swap targets are the fresh items, but components of *every* desired item
+    // (including ones we're completing) must be protected from being sold.
+    const swaps = computeSwaps(input, fresh, desired);
     return {
       phase,
       buildStyle,
-      items: [],
+      items: completable.slice(0, 3),
       swaps,
-      reasoning: swaps.length
-        ? 'Build completa — cambios sugeridos según cómo va la partida.'
-        : 'Build completa y acorde a la partida.',
+      reasoning: completable.length
+        ? 'Completá los items que ya estás armando antes de vender nada.'
+        : swaps.length
+          ? 'Build completa — cambios sugeridos según cómo va la partida.'
+          : 'Build completa y acorde a la partida.',
     };
   }
 
@@ -174,20 +197,47 @@ function selectItems(
 }
 
 // Pairs each desired item with an owned item worth replacing (not boots, not a
-// trinket, and not itself something we'd want to keep).
-function computeSwaps(input: ItemInput, desired: ItemSuggestion[]): ItemSwap[] {
-  const desiredIds = new Set(desired.map(d => d.itemId));
+// trinket, not a component of any item we're recommending, and not itself
+// something we'd want to keep).
+function computeSwaps(
+  input: ItemInput,
+  targets: ItemSuggestion[],
+  protectComponentsOf: ItemSuggestion[] = targets,
+): ItemSwap[] {
+  const desiredIds = new Set(targets.map(d => d.itemId));
+
+  // Never propose selling a component of any item we're suggesting (whether a
+  // swap target or one we're completing) — that's what finishes the build.
+  const desiredComponents = new Set<number>();
+  if (input.componentsOf) {
+    for (const d of protectComponentsOf) {
+      for (const c of input.componentsOf(d.itemId)) desiredComponents.add(c);
+    }
+  }
+
   const replaceable = input.ownedItemIds.filter(
-    id => id && !TRINKET_IDS.has(id) && !BOOTS_IDS.has(id) && !desiredIds.has(id),
+    id =>
+      id &&
+      !TRINKET_IDS.has(id) &&
+      !BOOTS_IDS.has(id) &&
+      !desiredIds.has(id) &&
+      !desiredComponents.has(id),
   );
 
   const swaps: ItemSwap[] = [];
   let ri = 0;
-  for (const item of desired) {
+  for (const item of targets) {
     if (ri >= replaceable.length) break;
     swaps.push({ outItemId: replaceable[ri++], in: item });
   }
   return swaps.slice(0, 3);
+}
+
+// True when the player owns at least one item in the recipe tree of `itemId`.
+function ownsComponentOf(input: ItemInput, itemId: number): boolean {
+  if (!input.componentsOf) return false;
+  const comps = input.componentsOf(itemId);
+  return comps.some(c => input.ownedItemIds.includes(c));
 }
 
 function getPhase(gameTime: number): GamePhase {

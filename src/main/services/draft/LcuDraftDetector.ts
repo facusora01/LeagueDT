@@ -19,8 +19,9 @@ export class LcuDraftDetector {
     this.lcu.on('connect', () => this.start());
     this.lcu.on('disconnect', () => this.stop());
 
-    // Also subscribe to WebSocket push events for immediate updates
-    this.lcu.on(`OnJsonApiEvent${CHAMP_SELECT_URI}`, (event: any) => {
+    // Also subscribe to WebSocket push events for immediate updates. The
+    // connector re-emits each event keyed by its raw URI, so listen on that.
+    this.lcu.on(CHAMP_SELECT_URI, (event: any) => {
       this.session.updateFromLcu(event?.data ?? null);
     });
   }
