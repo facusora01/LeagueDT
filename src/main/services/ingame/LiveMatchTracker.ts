@@ -3,7 +3,7 @@ import https from 'https';
 import { EventEmitter } from 'events';
 import type { LiveGameState, LivePlayerStats, LiveGameEvent } from './types';
 import { analyzeEnemyThreats } from './EnemyThreatAnalyzer';
-import { recommendItems, type ItemInput } from './ItemRecommendationEngine';
+import { recommendItems, type ItemInput, type ItemMeta } from './ItemRecommendationEngine';
 import { generateTips, createTipsContext } from './StrategicTipsEngine';
 
 const LIVE_CLIENT_URL = 'https://127.0.0.1:2999/liveclientdata/allgamedata';
@@ -23,8 +23,6 @@ const HEALING_CHAMPIONS = new Set([
 ]);
 
 type TagResolver = (championName: string) => string[];
-// Direct components of an item (its `from` recipe field), by item ID.
-type ItemRecipe = { id: number; from: number[] };
 
 export class LiveMatchTracker extends EventEmitter {
   private pollTimer: NodeJS.Timeout | null = null;
@@ -37,7 +35,9 @@ export class LiveMatchTracker extends EventEmitter {
   private simulating = false;
   // Resolves a live champion display name to its tags (injected from main).
   private resolveTags: TagResolver = () => [];
-  // Direct `from` components per item ID (injected from main; DataDragon recipes).
+  // Full live item pool from Data Dragon (injected from main). Drives both the
+  // recipe-aware logic and the data-driven item scoring — no hardcoded items.
+  private itemPool: ItemMeta[] = [];
   private recipeFrom = new Map<number, number[]>();
 
   setLocalChampionTags(tags: string[]) {
@@ -48,8 +48,9 @@ export class LiveMatchTracker extends EventEmitter {
     this.resolveTags = fn;
   }
 
-  /** Seeds item recipes so item advice is recipe-aware (no selling components). */
-  setItemRecipes(items: ItemRecipe[]) {
+  /** Seeds the live item pool (every DD item) so item advice is fully data-driven. */
+  setItemPool(items: ItemMeta[]) {
+    this.itemPool = items;
     this.recipeFrom = new Map(items.map(i => [i.id, i.from ?? []]));
   }
 
@@ -165,6 +166,7 @@ export class LiveMatchTracker extends EventEmitter {
       threatenedByAD,
       threatenedByAP,
       healingThreat,
+      items: this.itemPool,
       componentsOf: this.componentsOf,
     };
     this.emit('itemsUpdated', recommendItems(itemInput));

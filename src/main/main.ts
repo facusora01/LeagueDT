@@ -9,7 +9,7 @@ import { SummonerRepository } from './database/repositories/SummonerRepository';
 import { ChampionRepository } from './database/repositories/ChampionRepository';
 import { ChampionMasteryRepository } from './database/repositories/ChampionMasteryRepository';
 import { MatchRepository } from './database/repositories/MatchRepository';
-import { ItemRepository } from './database/repositories/ItemRepository';
+import type { ItemMeta } from './services/ingame/ItemRecommendationEngine';
 import { DraftSession } from './services/draft/DraftSession';
 import { LcuDraftDetector } from './services/draft/LcuDraftDetector';
 import { LiveMatchTracker } from './services/ingame/LiveMatchTracker';
@@ -354,8 +354,10 @@ async function loadCurrentSummonerFromLcu() {
       const account = await riotClient.getAccountByRiotId(routing, current.gameName, current.tagLine);
       puuid = account.puuid;
       realPuuid = true;
-    } catch (err) {
-      console.error('[LCU] Could not resolve real puuid via Account API:', err);
+    } catch (err: any) {
+      const status = err?.response?.status;
+      const hint = status === 401 || status === 403 ? ' (API key inválida o vencida)' : '';
+      console.error(`[LCU] Could not resolve real puuid via Account API: ${err?.message ?? err}${hint}`);
     }
   }
 
@@ -393,6 +395,34 @@ async function loadCurrentSummonerFromLcu() {
       console.error('[LCU] Mastery sync failed:', err);
     }
   }
+}
+
+// Maps the raw Data Dragon item.json into the engine's ItemMeta pool. Keeps
+// every item (recipes need components too); the engine decides what's
+// recommendable. Anti-heal is detected from the localized passive text.
+function buildItemPool(raw: any): ItemMeta[] {
+  const data = raw?.data;
+  if (!data) return [];
+  const grievousRe = /heridas graves|grievous wounds/i;
+  return Object.entries<any>(data).map(([id, it]) => {
+    const tags: string[] = it.tags ?? [];
+    return {
+      id: Number(id),
+      name: it.name ?? '',
+      tags,
+      stats: it.stats ?? {},
+      goldTotal: it.gold?.total ?? 0,
+      into: (it.into ?? []).map(Number),
+      from: (it.from ?? []).map(Number),
+      isBoots: tags.includes('Boots'),
+      isTrinket: tags.includes('Trinket'),
+      isConsumable: tags.includes('Consumable'),
+      sr: it.maps?.['11'] === true,
+      purchasable: it.gold?.purchasable === true,
+      grievous: grievousRe.test(it.description ?? ''),
+      requiredChampion: !!it.requiredChampion,
+    };
+  });
 }
 
 // Switches the window between normal, a click-through live overlay, and an
@@ -453,11 +483,13 @@ app.whenReady().then(async () => {
     // recommendations respect the actual champion and enemy composition.
     const tagsByName = new Map(champions.map(c => [c.name, c.tags]));
     liveTracker.setChampionResolver(name => tagsByName.get(name) ?? []);
-    // Seed item recipes so item swap advice never sells a component of the very
-    // item it recommends (e.g. selling a Long Sword that builds into it).
-    const items = await ItemRepository.findAll();
-    liveTracker.setItemRecipes(items.map(i => ({ id: i.id, from: i.from })));
-    console.log(`[Draft] Loaded ${champions.length} champions, ${items.length} item recipes`);
+    // Feed the full live item pool (every Data Dragon item with its real tags,
+    // stats, recipe and passives) so item advice is data-driven — no hardcoded
+    // item list, and swaps never sell a component of what they recommend.
+    liveTracker.setItemPool(buildItemPool(dataDragon!.getCachedData('item')));
+    // Rune pages resolve from the live runesReforged dataset — no hardcoded IDs.
+    draftSession.setRuneTrees(dataDragon!.getCachedData('runesReforged') ?? []);
+    console.log(`[Draft] Loaded ${champions.length} champions into draft session`);
   }).catch(err => console.error('[DataDragon] Init error:', err));
 
   // Apply saved API key + overlay hotkey if present

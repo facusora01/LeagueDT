@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
 import { generateRecommendations, type ChampionData, type MasteryData, type ChampionRecommendation } from './ChampionRecommendationEngine';
 import { generateBanSuggestions, type BanSuggestion } from './BanAdvisor';
-import { recommendRunes, type RuneRecommendation } from './RuneRecommendationEngine';
+import { recommendRunes, type RuneRecommendation, type RuneTree } from './RuneRecommendationEngine';
 
 export type DraftPhase = 'idle' | 'banning' | 'picking' | 'finished';
 
@@ -36,6 +36,7 @@ export class DraftSession extends EventEmitter {
   private allChampions: ChampionData[] = [];
   private masteries: MasteryData[] = [];
   private highPriorityMeta: number[] = [];
+  private runeTrees: RuneTree[] = [];
   private simulating = false;
   private lastRuneChampId = 0;
 
@@ -43,6 +44,11 @@ export class DraftSession extends EventEmitter {
     this.allChampions = champions;
     this.masteries = masteries;
     this.highPriorityMeta = meta;
+  }
+
+  /** Seeds the live rune tree dataset so rune pages resolve from real data. */
+  setRuneTrees(trees: RuneTree[]) {
+    this.runeTrees = trees;
   }
 
   /** Called by LcuDraftDetector each time the LCU session event fires */
@@ -134,7 +140,7 @@ export class DraftSession extends EventEmitter {
     if (localChampId !== this.lastRuneChampId) {
       this.lastRuneChampId = localChampId;
       const champ = localChampId ? this.toChampionData(localChampId) : null;
-      this.emit('runeSuggestion', champ ? recommendRunes(champ.tags) : null);
+      this.emit('runeSuggestion', champ ? recommendRunes(champ.tags, this.runeTrees) : null);
     }
 
     // Generate recommendations when it's our turn

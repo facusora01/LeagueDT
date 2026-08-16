@@ -63,7 +63,9 @@ export interface RuneRefDTO {
 export interface RuneRecDTO {
   primaryTree: RuneRefDTO;
   keystone: RuneRefDTO;
+  primaryRunes: RuneRefDTO[];
   secondaryTree: RuneRefDTO;
+  secondaryRunes: RuneRefDTO[];
   reasoning: string;
 }
 

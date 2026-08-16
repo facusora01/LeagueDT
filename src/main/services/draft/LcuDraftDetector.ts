@@ -54,7 +54,8 @@ export class LcuDraftDetector {
       if (tphase !== this.lastLoggedPhase) {
         console.log(
           `[DraftDetector] champ-select active — timer.phase=${tphase}, ` +
-          `myTeam=${data?.myTeam?.length ?? 0}, theirTeam=${data?.theirTeam?.length ?? 0}`,
+          `myTeam=${data?.myTeam?.length ?? 0}, theirTeam=${data?.theirTeam?.length ?? 0}, ` +
+          `actions=${data?.actions?.length ?? 0}, keys=[${data ? Object.keys(data).join(',') : ''}]`,
         );
         this.lastLoggedPhase = tphase;
       }

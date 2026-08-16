@@ -133,10 +133,16 @@ export const DraftView: React.FC = () => {
               <div>
                 <span className="text-text-muted">Primaria: </span>
                 <span className="text-primary">{runes.primaryTree.name}</span>
+                {runes.primaryRunes.length > 0 && (
+                  <span className="text-text-muted"> · {runes.primaryRunes.map(r => r.name).join(', ')}</span>
+                )}
               </div>
               <div>
                 <span className="text-text-muted">Secundaria: </span>
                 <span className="text-text-secondary">{runes.secondaryTree.name}</span>
+                {runes.secondaryRunes.length > 0 && (
+                  <span className="text-text-muted"> · {runes.secondaryRunes.map(r => r.name).join(', ')}</span>
+                )}
               </div>
             </div>
           </div>
