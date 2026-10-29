@@ -6,3 +6,7 @@ node_modules
 dist
 
 /src/generated/prisma
+
+# Local SQLite database
+dev.db
+dev.db-journal
